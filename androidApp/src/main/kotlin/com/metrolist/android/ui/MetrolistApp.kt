@@ -262,6 +262,7 @@ import com.metrolist.shared.generated.resources.back
 import com.metrolist.shared.generated.resources.cancel
 import com.metrolist.shared.generated.resources.continue_playback_message
 import com.metrolist.shared.generated.resources.continue_playback_title
+import com.metrolist.shared.generated.resources.dashboard
 import com.metrolist.shared.generated.resources.devtools_title
 import com.metrolist.shared.generated.resources.downloads
 import com.metrolist.shared.generated.resources.error
@@ -484,7 +485,7 @@ fun MetrolistApp(
             onRejectPairing = AndroidDeviceConnect.manager::rejectPairing,
         )
         val initialStartRoute = remember { resolveAndPersistStartupScreen() }
-        val topLevelRoutes = remember { setOf(Screen.Home, Screen.Search, Screen.Library, Screen.EasterEgg) }
+        val topLevelRoutes = remember { setOf(Screen.Home, Screen.Search, Screen.Statistics, Screen.Library, Screen.EasterEgg) }
         val navigationState =
             key(navigationSaveKey) {
                 rememberNavigationState(
@@ -809,7 +810,7 @@ fun MetrolistApp(
         val immersiveContent = remember { mutableStateOf(false) }
         val shouldRenderMiniPlayer = shouldShowMiniPlayer && !shouldHideMiniPlayerForIme
 
-        val topLevelScreens = remember { setOf(Screen.Home, Screen.Library, Screen.EasterEgg) }
+        val topLevelScreens = remember { setOf(Screen.Home, Screen.Statistics, Screen.Library, Screen.EasterEgg) }
         val shouldShowTopBar =
             navigationState.topLevelRoute in topLevelScreens && currentRoute in topLevelScreens
 
@@ -1485,6 +1486,10 @@ fun MetrolistApp(
                                                             when (navigationState.topLevelRoute) {
                                                                 Screen.Home -> {
                                                                     stringResource(Res.string.home)
+                                                                }
+
+                                                                Screen.Statistics -> {
+                                                                    stringResource(Res.string.dashboard)
                                                                 }
 
                                                                 Screen.Library -> {
@@ -2446,7 +2451,7 @@ fun resolveAndPersistStartupScreen(): Screen {
 
 fun NavKey.isVisibleNavigationScreen(): Boolean =
     when (this) {
-        Screen.Home, Screen.Search, Screen.Library, Screen.EasterEgg -> true
+        Screen.Home, Screen.Search, Screen.Statistics, Screen.Library, Screen.EasterEgg -> true
         else -> false
     }
 
@@ -2817,7 +2822,7 @@ fun getEntryProvider(
 
         entry<Screen.Statistics>(metadata = navTabMetadata) {
             StatsScreen(
-                onNavigateBack = { navigator.goBack() },
+                onNavigateBack = if (navigator.state.topLevelRoute == Screen.Statistics) null else ({ navigator.goBack() }),
                 onOpenDetail = {
                     detail,
                     period,

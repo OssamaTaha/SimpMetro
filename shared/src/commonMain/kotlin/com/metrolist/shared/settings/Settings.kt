@@ -348,10 +348,10 @@ class Settings(
     var enableHapticFeedback by preference(EnableHapticFeedbackKey, true)
 
     // Smart Downloads (Automated taste-based offline cache)
-    var smartDownloadEnabled by preference("smart_download_enabled", false)
+    var smartDownloadEnabled by preference("smart_download_enabled", true)
     var smartDownloadQuota by preference("smart_download_quota", 100)
     var smartDownloadWifiOnly by preference("smart_download_wifi_only", true)
-    var smartDownloadChargingOnly by preference("smart_download_charging_only", true)
+    var smartDownloadChargingOnly by preference("smart_download_charging_only", false)
 
     var appLayout by preference(AppLayout.EXPRESS)
     var showMiniplayer by preference(false)

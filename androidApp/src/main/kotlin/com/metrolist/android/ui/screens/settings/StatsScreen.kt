@@ -53,7 +53,7 @@ import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun StatsScreen(
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     onOpenDetail: (detail: String, period: String, dateRange: StatisticsDateRange?, mode: StatisticsPeriodMode) -> Unit,
     viewModel: StatsViewModel = koinViewModel(),
 ) {

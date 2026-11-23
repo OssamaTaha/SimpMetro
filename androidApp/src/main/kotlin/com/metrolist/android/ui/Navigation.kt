@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.metrolist.shared.generated.resources.Res
+import com.metrolist.shared.generated.resources.dashboard
 import com.metrolist.shared.generated.resources.filter_library
 import com.metrolist.shared.generated.resources.home
 import com.metrolist.shared.generated.resources.listen_together
@@ -74,7 +75,7 @@ val Screen.labelRes: StringResource?
             Screen.EasterEgg -> Res.string.mysterious_fourth_tab
             Screen.Settings -> Res.string.settings
             Screen.History -> Res.string.menu_history
-            Screen.Statistics -> Res.string.statistics
+            Screen.Statistics -> Res.string.dashboard
             Screen.ListenTogether -> Res.string.listen_together
             else -> null
         }
@@ -87,7 +88,7 @@ val Screen.icon: ImageVector?
             Screen.Search -> MetrolistIcons.Outlined.Search
             Screen.Settings -> MetrolistIcons.Outlined.Settings
             Screen.History -> MetrolistIcons.Outlined.History
-            Screen.Statistics -> MetrolistIcons.Outlined.SsidChart
+            Screen.Statistics -> MetrolistIcons.Outlined.BarChart
             Screen.ListenTogether -> MetrolistIcons.Outlined.Group
             else -> null
         }
@@ -101,7 +102,7 @@ val Screen.iconFilled: ImageVector?
             Screen.EasterEgg -> MetrolistIcons.Filled.QuestionMark
             Screen.Settings -> MetrolistIcons.Filled.Settings
             Screen.History -> MetrolistIcons.Filled.History
-            Screen.Statistics -> MetrolistIcons.Filled.SsidChart
+            Screen.Statistics -> MetrolistIcons.Filled.BarChart
             Screen.ListenTogether -> MetrolistIcons.Outlined.Group
             else -> null
         }
@@ -253,8 +254,9 @@ fun MetrolistNavigationScaffold(
 private fun floatingNavigationItems(): List<Screen> =
     buildList {
         if (Settings.shared.showBottomNavHome) add(Screen.Home)
-        if (Settings.shared.showBottomNavLibrary) add(Screen.Library)
         if (Settings.shared.showBottomNavSearch) add(Screen.Search)
+        add(Screen.Statistics)
+        if (Settings.shared.showBottomNavLibrary) add(Screen.Library)
         if (isEmpty()) add(Screen.EasterEgg)
     }
 
@@ -262,6 +264,7 @@ private fun visibleNavigationItems(): List<Screen> =
     buildList {
         if (Settings.shared.showBottomNavHome) add(Screen.Home)
         if (Settings.shared.showBottomNavSearch) add(Screen.Search)
+        add(Screen.Statistics)
         if (Settings.shared.showBottomNavLibrary) add(Screen.Library)
         if (isEmpty()) add(Screen.EasterEgg)
     }

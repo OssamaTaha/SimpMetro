@@ -16,7 +16,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import com.metrolist.shared.settings.Settings
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,6 +86,9 @@ fun DownloadsScreen(onNavigateBack: () -> Unit) {
     val manager: SongDownloadManager = koinInject()
     val requests by manager.requests.collectAsStateWithLifecycle()
     val visible = remember(requests) { requests.pendingDownloads() }
+    val context = LocalContext.current
+    var syncTriggered by remember { mutableStateOf(false) }
+
     SettingsSubScreen(
         title = stringResource(Res.string.downloads),
         onNavigateBack = onNavigateBack,
@@ -101,12 +111,43 @@ fun DownloadsScreen(onNavigateBack: () -> Unit) {
             }
         },
     ) {
-        if (visible.isEmpty()) {
-            DownloadsEmptyState()
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-                items(visible, key = { it.song.id }) { request ->
-                    DownloadQueueRow(request, manager, Modifier.animateItem())
+        Column(modifier = Modifier.fillMaxSize()) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Smart Downloads", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Auto-downloads songs tailored to your taste",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            syncTriggered = true
+                            com.metrolist.android.playback.smartdownload.SmartDownloadWorker.triggerImmediate(context, Settings.shared.smartDownloadQuota)
+                        },
+                        modifier = Modifier.padding(start = 8.dp),
+                    ) {
+                        Text(if (syncTriggered) "Syncing…" else "Sync Now")
+                    }
+                }
+            }
+
+            if (visible.isEmpty()) {
+                DownloadsEmptyState()
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                    items(visible, key = { it.song.id }) { request ->
+                        DownloadQueueRow(request, manager, Modifier.animateItem())
+                    }
                 }
             }
         }

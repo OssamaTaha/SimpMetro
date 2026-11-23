@@ -353,6 +353,19 @@ class App :
         AndroidPlaylistImportNotifier.ensureChannel(this)
         LastFmSessionNotification.register(this)
 
+        if (Settings.shared.smartDownloadEnabled) {
+            com.metrolist.android.playback.smartdownload.SmartDownloadWorker.schedule(
+                this,
+                quota = Settings.shared.smartDownloadQuota,
+                wifiOnly = Settings.shared.smartDownloadWifiOnly,
+                chargingOnly = Settings.shared.smartDownloadChargingOnly,
+            )
+            com.metrolist.android.playback.smartdownload.SmartDownloadWorker.triggerImmediate(
+                this,
+                quota = Settings.shared.smartDownloadQuota,
+            )
+        }
+
         Timber.tag(TAG).d("App onCreate complete elapsed=%dms", SystemClock.elapsedRealtime() - appStart)
     }
 

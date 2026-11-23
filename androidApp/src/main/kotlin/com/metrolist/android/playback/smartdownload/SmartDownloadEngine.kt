@@ -84,6 +84,19 @@ class SmartDownloadEngine(
             }
         }
 
+        // 4. Discovery fallback for fresh installs: Query top trending tracks if user has no listening history yet
+        if (candidateList.size < 10) {
+            try {
+                val trendingHits = GlobalYouTubeRepository.instance
+                    .search("Top Hits")
+                    .filterIsInstance<SongItem>()
+                    .take(count - candidateList.size)
+                candidateList.addAll(trendingHits)
+            } catch (e: Exception) {
+                Timber.w(e, "SmartDownload: Trending hits fallback search failed")
+            }
+        }
+
         candidateList.distinctBy { it.id }.take(count)
     }
 
@@ -95,12 +108,7 @@ class SmartDownloadEngine(
         val candidates = resolveCandidates(quota)
         if (candidates.isEmpty()) return@withContext 0
 
-        var enqueuedCount = 0
-        for (song in candidates) {
-            val success = songDownloadManager.download(song)
-            if (success) enqueuedCount++
-        }
-
+        val enqueuedCount = songDownloadManager.downloadAll(candidates)
         Timber.d("SmartDownload: Synchronized ${candidates.size} songs, enqueued $enqueuedCount new tracks")
         enqueuedCount
     }
@@ -142,7 +150,7 @@ class SmartDownloadWorker(
             context: Context,
             quota: Int = 100,
             wifiOnly: Boolean = true,
-            chargingOnly: Boolean = true,
+            chargingOnly: Boolean = false,
         ) {
             val constraints = Constraints.Builder().apply {
                 if (wifiOnly) setRequiredNetworkType(NetworkType.UNMETERED)
@@ -159,6 +167,16 @@ class SmartDownloadWorker(
                 ExistingPeriodicWorkPolicy.UPDATE,
                 request
             )
+        }
+
+        /**
+         * Immediately enqueues a one-time Smart Download sync without waiting for the periodic timer.
+         */
+        fun triggerImmediate(context: Context, quota: Int = 100) {
+            val request = androidx.work.OneTimeWorkRequestBuilder<SmartDownloadWorker>()
+                .setInputData(androidx.work.workDataOf(KEY_QUOTA to quota))
+                .build()
+            WorkManager.getInstance(context).enqueue(request)
         }
 
         /**

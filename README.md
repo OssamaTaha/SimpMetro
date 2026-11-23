@@ -1,9 +1,41 @@
-<div style="display: flex; gap: 1rem;">
+# SimpMetro 🎵
+
+**SimpMetro** is a customized fusion of **SimpMusic** and **Metrolist**, designed for instant audio playback, dynamic Material You theming, full listening analytics, and automated offline caching.
+
+### 🌟 Key Features
+- **Ultra-Fast Playback Engine:** Powered by InnerTube and Media3 ExoPlayer with direct stream caching (<500ms song start latency, no cipher decryption delays).
+- **Material 3 / Material You Monet:** Dynamic adaptive palette theming across the entire application.
+- **Dedicated Analytics Dashboard:** Native bottom navigation tab featuring:
+  - **24-Hour Listening Clock** (visual breakdown of listening habits by hour)
+  - **5-Axis Listening Fingerprint** (radar chart analyzing Energy, Tempo, Diversity, Popularity, and Repetition)
+  - **SIMPMETRO Paper Receipt** (Receiptify-style tear-off listening receipt)
+- **YouTube Music-Style Smart Downloads:** Taste-based background music caching over Wi-Fi, featuring zero-history discovery fallback and an instant manual "Sync Now" button.
+- **Antigravity Chat Transcript:** Full session development history and architectural decisions are preserved in [docs/ANTIGRAVITY_CHAT.md](docs/ANTIGRAVITY_CHAT.md).
+
+---
+
+
   <img src="fastlane/metadata/android/en-US/images/icon.png" alt="Metrolist app icon" width="200" height="200" />
   <div>
       <h1>Metrolist</h1>
       <h3>A Material Design YouTube Music client for Android, iOS and desktop</h3>
-      <div style="display: flex; gap: 1rem;">
+      # SimpMetro 🎵
+
+**SimpMetro** is a customized fusion of **SimpMusic** and **Metrolist**, designed for instant audio playback, dynamic Material You theming, full listening analytics, and automated offline caching.
+
+### 🌟 Key Features
+- **Ultra-Fast Playback Engine:** Powered by InnerTube and Media3 ExoPlayer with direct stream caching (<500ms song start latency, no cipher decryption delays).
+- **Material 3 / Material You Monet:** Dynamic adaptive palette theming across the entire application.
+- **Dedicated Analytics Dashboard:** Native bottom navigation tab featuring:
+  - **24-Hour Listening Clock** (visual breakdown of listening habits by hour)
+  - **5-Axis Listening Fingerprint** (radar chart analyzing Energy, Tempo, Diversity, Popularity, and Repetition)
+  - **SIMPMETRO Paper Receipt** (Receiptify-style tear-off listening receipt)
+- **YouTube Music-Style Smart Downloads:** Taste-based background music caching over Wi-Fi, featuring zero-history discovery fallback and an instant manual "Sync Now" button.
+- **Antigravity Chat Transcript:** Full session development history and architectural decisions are preserved in [docs/ANTIGRAVITY_CHAT.md](docs/ANTIGRAVITY_CHAT.md).
+
+---
+
+
         <a href="https://github.com/MetrolistGroup/Metrolist/releases"><img src="https://img.shields.io/github/v/release/MetrolistGroup/Metrolist?style=for-the-badge&labelColor=0d1117" alt="Latest release" /></a>
         <a href="https://github.com/MetrolistGroup/Metrolist/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MetrolistGroup/metrolist?style=for-the-badge&labelColor=0d1117" alt="License" /></a>
         <a href="https://github.com/MetrolistGroup/Metrolist/releases"><img src="https://img.shields.io/github/downloads/MetrolistGroup/Metrolist/total?style=for-the-badge&labelColor=0d1117" alt="Downloads" /></a>

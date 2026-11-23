@@ -56,7 +56,7 @@ jobs:
   package:
     name: ${{ matrix.arch }} ZIP
     # Blacksmith has no Windows ARM64 runners; GitHub's native one avoids cross-building the runtime and launcher.
-    runs-on: ${{ matrix.arch == 'arm64' && (vars.WINDOWS_ARM64_RUNNER || 'windows-11-arm') || 'blacksmith-4vcpu-windows-2025' }}
+    runs-on: ${{ matrix.arch == 'arm64' && (vars.WINDOWS_ARM64_RUNNER || 'windows-11-arm') || 'windows-latest' }}
     timeout-minutes: ${{ matrix.arch == 'arm64' && 60 || 30 }}
     strategy:
       fail-fast: false

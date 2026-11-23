@@ -84,6 +84,15 @@ import com.metrolist.shared.backup.foreignImportMessage
 import com.metrolist.shared.backup.importForeignBackup
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.entities.PlaylistEntity
+import com.metrolist.shared.sync.CrossDeviceSyncEngine
+import com.metrolist.shared.generated.resources.library_sync
+import com.metrolist.shared.generated.resources.library_sync_summary
+import com.metrolist.shared.generated.resources.library_sync_peer_address
+import com.metrolist.shared.generated.resources.library_sync_peer_hint
+import com.metrolist.shared.generated.resources.library_sync_connect_and_sync
+import com.metrolist.shared.generated.resources.library_sync_syncing
+import com.metrolist.shared.generated.resources.library_sync_success
+import com.metrolist.shared.generated.resources.library_sync_failed
 import com.metrolist.shared.deezerimport.DeezerImportManager
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.action_backup
@@ -1980,6 +1989,85 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
                     ),
                 ),
         )
+
+        var syncAddressInput by remember { mutableStateOf("") }
+        val syncResult by CrossDeviceSyncEngine.lastSyncResult.collectAsState()
+        val isSyncing by CrossDeviceSyncEngine.isSyncing.collectAsState()
+
+        SettingsSubScreenGroup(
+            title = stringResource(Res.string.library_sync),
+            items =
+                listOf(
+                    SettingsSubScreenItem(
+                        title = stringResource(Res.string.library_sync_peer_address),
+                        description = stringResource(Res.string.library_sync_summary),
+                        enabled = controlsEnabled && !isSyncing,
+                        onClick = {},
+                    ),
+                ),
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = syncAddressInput,
+                    onValueChange = { syncAddressInput = it },
+                    label = { Text(stringResource(Res.string.library_sync_peer_address)) },
+                    placeholder = { Text(stringResource(Res.string.library_sync_peer_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = {
+                        val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke() ?: return@Button
+                        scope.launch {
+                            val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                            CrossDeviceSyncEngine.syncWithPeer(
+                                peerEndpoint = syncAddressInput,
+                                database = db,
+                                deviceId = Settings.shared.deviceConnectDeviceId,
+                                deviceName = Settings.shared.deviceConnectDeviceName,
+                                downloadedIds = downloaded,
+                            )
+                        }
+                    },
+                    enabled = syncAddressInput.isNotBlank() && !isSyncing,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        if (isSyncing) {
+                            stringResource(Res.string.library_sync_syncing)
+                        } else {
+                            stringResource(Res.string.library_sync_connect_and_sync)
+                        },
+                    )
+                }
+                if (syncResult != null) {
+                    val res = syncResult!!
+                    if (res.isSuccess) {
+                        Text(
+                            stringResource(
+                                Res.string.library_sync_success,
+                                res.songsMerged,
+                                res.playlistsMerged,
+                                res.downloadsQueued,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    } else {
+                        Text(
+                            res.errorMessage ?: stringResource(Res.string.library_sync_failed),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
+        }
 
         SettingsSubScreenGroup(
             title = stringResource(Res.string.playlist_imports_title),

@@ -55,7 +55,7 @@ on:
 jobs:
   package:
     name: ${{ matrix.arch }} AppImage
-    runs-on: ${{ matrix.arch == 'arm64' && 'blacksmith-8vcpu-ubuntu-2404-arm' || 'blacksmith-4vcpu-ubuntu-2404' }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-latest-arm' || 'ubuntu-latest' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false

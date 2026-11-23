@@ -63,6 +63,8 @@ import com.metrolist.shared.api.lastfm.LastFmGalleryBrowser
 import com.metrolist.shared.auth.AuthManager
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.checkAndroidDatabaseVersion
+import com.metrolist.shared.db.entities.KIND_DOWNLOAD
+import com.metrolist.shared.db.entities.toSongItem
 import com.metrolist.shared.discord.DiscordRpcManager
 import com.metrolist.shared.discord.DiscordTokenStore
 import com.metrolist.shared.discord.observeDiscordInitialization
@@ -74,6 +76,7 @@ import com.metrolist.shared.state.GlobalYouTube
 import com.metrolist.shared.state.SongLikeState
 import com.metrolist.shared.state.SongMetadataState
 import com.metrolist.shared.state.coreModule
+import com.metrolist.shared.sync.CrossDeviceSyncEngine
 import com.metrolist.shared.utils.isCrashReportingAvailable
 import com.metrolist.shared.youtube.di.sharedModule
 import com.metrolist.shared.youtube.playback.AndroidContextProvider
@@ -86,6 +89,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -315,6 +319,23 @@ class App :
         }
         Timber.tag(TAG).d("Koin init complete elapsed=%dms", SystemClock.elapsedRealtime() - koinStart)
 
+        CrossDeviceSyncEngine.localDatabaseProvider = { get<MusicDatabase>() }
+        CrossDeviceSyncEngine.localDownloadsProvider = {
+            get<MusicDatabase>().dao().cachedAudioIdsByKind(KIND_DOWNLOAD).first()
+        }
+        CrossDeviceSyncEngine.onNewDownloadsRequested = { songIds ->
+            get<CoroutineScope>().launch(Dispatchers.IO) {
+                val db = get<MusicDatabase>()
+                val songs =
+                    songIds.mapNotNull { id ->
+                        db.dao().getSongById(id)?.toSongItem()
+                    }
+                if (songs.isNotEmpty()) {
+                    get<SongDownloadManager>().downloadAll(songs)
+                }
+            }
+        }
+
         get<CoroutineScope>().launch(Dispatchers.Main.immediate) {
             observeDiscordInitialization {
                 DiscordTokenStore.init(this@App)
@@ -359,10 +380,6 @@ class App :
                 quota = Settings.shared.smartDownloadQuota,
                 wifiOnly = Settings.shared.smartDownloadWifiOnly,
                 chargingOnly = Settings.shared.smartDownloadChargingOnly,
-            )
-            com.metrolist.android.playback.smartdownload.SmartDownloadWorker.triggerImmediate(
-                this,
-                quota = Settings.shared.smartDownloadQuota,
             )
         }
 

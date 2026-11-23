@@ -10,6 +10,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -97,6 +99,9 @@ import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.albums
 import com.metrolist.shared.generated.resources.artists
 import com.metrolist.shared.generated.resources.back
+import com.metrolist.shared.generated.resources.listening_clock
+import com.metrolist.shared.generated.resources.listening_fingerprint
+import com.metrolist.shared.generated.resources.listening_receipt
 import com.metrolist.shared.generated.resources.more_options_for
 import com.metrolist.shared.generated.resources.n_album
 import com.metrolist.shared.generated.resources.n_artist
@@ -106,6 +111,7 @@ import com.metrolist.shared.generated.resources.n_track
 import com.metrolist.shared.generated.resources.n_week
 import com.metrolist.shared.generated.resources.n_year
 import com.metrolist.shared.generated.resources.play
+import com.metrolist.shared.generated.resources.recently_played
 import com.metrolist.shared.generated.resources.refreshing
 import com.metrolist.shared.generated.resources.see_all
 import com.metrolist.shared.generated.resources.share
@@ -147,12 +153,14 @@ import com.metrolist.shared.ui.statistics.FingerprintChart
 import com.metrolist.shared.ui.statistics.HourlyActivityChart
 import com.metrolist.shared.ui.statistics.ListeningClockChart
 import com.metrolist.shared.ui.statistics.ListeningReceiptView
+import com.metrolist.shared.ui.statistics.MusicTasteCard
 import com.metrolist.shared.ui.statistics.ReceiptLine
 import com.metrolist.shared.ui.statistics.StatisticsDateRange
 import com.metrolist.shared.ui.statistics.StatisticsDateRangePicker
 import com.metrolist.shared.ui.statistics.StatisticsPeriodMode
 import com.metrolist.shared.ui.statistics.StatisticsShareDialog
 import com.metrolist.shared.ui.statistics.calculateFingerprint
+import com.metrolist.shared.ui.statistics.calculateMusicTasteProfile
 import com.metrolist.shared.ui.statistics.calendarRange
 import com.metrolist.shared.ui.statistics.canExportStatistics
 import com.metrolist.shared.ui.statistics.statisticsDateRangeLabel
@@ -196,6 +204,15 @@ data class StatisticsItem(
     val rankedTitle: String = title,
 )
 
+data class StatisticsRecentItem(
+    val id: String,
+    val songId: String,
+    val title: String,
+    val subtitle: String,
+    val thumbnailUrl: String?,
+    val timestamp: Long,
+)
+
 data class StatisticsUiState(
     val period: StatisticsPeriod = StatisticsPeriod.WEEK,
     val dateRange: StatisticsDateRange? = null,
@@ -209,6 +226,7 @@ data class StatisticsUiState(
     val tracks: List<StatisticsItem> = emptyList(),
     val albums: List<StatisticsItem> = emptyList(),
     val artists: List<StatisticsItem> = emptyList(),
+    val recentItems: List<StatisticsRecentItem> = emptyList(),
     val isLoading: Boolean = false,
     val hasLoaded: Boolean = !isLoading,
     val errorMessage: String? = null,
@@ -230,6 +248,7 @@ fun StatisticsScreen(
     onOpenDetail: ((StatisticsDetail) -> Unit)? = null,
     onNavigateBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    topContentPadding: Dp = 0.dp,
     bottomContentPadding: Dp = 0.dp,
     onArtistVisible: (suspend (StatisticsItem) -> Unit)? = null,
     artistLookupGeneration: Int = 0,
@@ -297,13 +316,25 @@ fun StatisticsScreen(
             } else {
                 Surface(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize()) {
-                        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                onNavigateBack?.let { BackButton(it) }
-                                Spacer(Modifier.weight(1f))
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .then(
+                                    if (topContentPadding == 0.dp && onNavigateBack != null) {
+                                        Modifier.windowInsetsPadding(WindowInsets.statusBars)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        ) {
+                            if (onNavigateBack != null) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    BackButton(onNavigateBack)
+                                    Spacer(Modifier.weight(1f))
+                                }
                             }
                             StatisticsRefreshIndicator(state.isLoading && state.hasLoaded)
                             state.errorMessage?.let {
@@ -350,16 +381,18 @@ fun StatisticsScreen(
                                             .fillMaxSize()
                                             .desktopArrowScroll(listState)
                                             .graphicsLayer { this.alpha = alpha },
-                                    contentPadding = PaddingValues(bottom = 96.dp + bottomContentPadding),
+                                    contentPadding = PaddingValues(top = topContentPadding, bottom = 96.dp + bottomContentPadding),
                                     verticalArrangement = Arrangement.spacedBy(18.dp),
                                 ) {
                                     item {
                                         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text(
-                                                stringResource(Res.string.statistics),
-                                                style = MaterialTheme.typography.headlineLarge,
-                                                modifier = Modifier.semantics { heading() },
-                                            )
+                                            if (onNavigateBack != null) {
+                                                Text(
+                                                    stringResource(Res.string.statistics),
+                                                    style = MaterialTheme.typography.headlineLarge,
+                                                    modifier = Modifier.semantics { heading() },
+                                                )
+                                            }
                                             Text(
                                                 statisticsSummary(state),
                                                 style = MaterialTheme.typography.bodyMedium,
@@ -383,6 +416,27 @@ fun StatisticsScreen(
                                         }
                                     }
                                     item { PeriodButtons(state, onPeriodSelected, onModeSelected, onDateRangeSelected) }
+                                    item {
+                                        val tasteProfile =
+                                            remember(
+                                                state.totalPlays,
+                                                state.artistCount,
+                                                state.tracks,
+                                                state.artists,
+                                                state.hourlyStats,
+                                                state.dailyStats,
+                                            ) {
+                                                calculateMusicTasteProfile(
+                                                    totalPlays = state.totalPlays,
+                                                    distinctArtists = state.artistCount,
+                                                    tracks = state.tracks,
+                                                    artists = state.artists,
+                                                    hourlyStats = state.hourlyStats,
+                                                    dailyStats = state.dailyStats,
+                                                )
+                                            }
+                                        MusicTasteCard(profile = tasteProfile)
+                                    }
                                     if (state.isLoading && !state.hasLoaded) {
                                         item { LoadingScreen(Modifier.fillMaxWidth().height(160.dp)) }
                                     } else {
@@ -400,6 +454,23 @@ fun StatisticsScreen(
                                             StatisticsCarousel(artistCount(state.artistCount), state.artists, artistsState, onItemClick, {
                                                 openDetail(StatisticsDetail.ARTISTS)
                                             }, onItemMenu, onArtistVisible, artistLookupGeneration)
+                                        }
+                                        if (state.recentItems.isNotEmpty()) {
+                                            item {
+                                                StatisticsRecentSection(
+                                                    items = state.recentItems,
+                                                    onItemClick = { recent ->
+                                                        onPlayItem?.invoke(
+                                                            StatisticsItem(
+                                                                id = "track:${recent.songId}",
+                                                                title = recent.title,
+                                                                subtitle = recent.subtitle,
+                                                                thumbnailUrl = recent.thumbnailUrl,
+                                                            ),
+                                                        )
+                                                    },
+                                                )
+                                            }
                                         }
                                         item { StatisticsCard(stringResource(Res.string.statistics_overview)) { SummaryGrid(state) } }
                                         item {
@@ -422,47 +493,71 @@ fun StatisticsScreen(
                                             ) { HourlyActivityChart(state.hourlyStats) }
                                         }
                                         item {
-                                            StatisticsCard("Listening Clock") {
-                                                val playsByHour = remember(state.hourlyStats) {
-                                                    (0..23).map { state.hourlyStats[it] ?: 0 }
-                                                }
+                                            StatisticsCard(stringResource(Res.string.listening_clock)) {
+                                                val playsByHour =
+                                                    remember(state.hourlyStats) {
+                                                        (0..23).map { state.hourlyStats[it] ?: 0 }
+                                                    }
                                                 ListeningClockChart(playsByHour = playsByHour)
                                             }
                                         }
                                         item {
-                                            StatisticsCard("Listening Fingerprint") {
-                                                val fingerprint = remember(state.totalPlays, state.artistCount, state.tracks, state.dailyStats, state.hourlyStats) {
-                                                    calculateFingerprint(
-                                                        totalPlays = state.totalPlays,
-                                                        distinctArtists = state.artistCount,
-                                                        distinctTracks = state.tracks.size,
-                                                        hourlyStats = state.hourlyStats,
-                                                        dailyStats = state.dailyStats,
-                                                    )
-                                                }
+                                            StatisticsCard(stringResource(Res.string.listening_fingerprint)) {
+                                                val fingerprint =
+                                                    remember(
+                                                        state.totalPlays,
+                                                        state.artistCount,
+                                                        state.tracks,
+                                                        state.dailyStats,
+                                                        state.hourlyStats,
+                                                    ) {
+                                                        calculateFingerprint(
+                                                            totalPlays = state.totalPlays,
+                                                            distinctArtists = state.artistCount,
+                                                            distinctTracks = state.tracks.size,
+                                                            hourlyStats = state.hourlyStats,
+                                                            dailyStats = state.dailyStats,
+                                                        )
+                                                    }
                                                 FingerprintChart(current = fingerprint)
                                             }
                                         }
                                         item {
-                                            StatisticsCard("Listening Receipt") {
-                                                val receiptLines = remember(state.tracks) {
-                                                    if (state.tracks.isNotEmpty()) {
-                                                        state.tracks.take(10).mapIndexed { index, item ->
-                                                            ReceiptLine(
-                                                                plays = (10 - index).coerceAtLeast(1),
-                                                                title = item.title,
-                                                                artist = item.subtitle,
-                                                                durationMs = 210000L,
+                                            StatisticsCard(stringResource(Res.string.listening_receipt)) {
+                                                val receiptLines =
+                                                    remember(state.tracks) {
+                                                        if (state.tracks.isNotEmpty()) {
+                                                            state.tracks.take(10).mapIndexed { index, item ->
+                                                                ReceiptLine(
+                                                                    plays = (10 - index).coerceAtLeast(1),
+                                                                    title = item.title,
+                                                                    artist = item.subtitle,
+                                                                    durationMs = 210000L,
+                                                                )
+                                                            }
+                                                        } else {
+                                                            listOf(
+                                                                ReceiptLine(
+                                                                    plays = 1,
+                                                                    title = "Play your first track",
+                                                                    artist = "SimpMetro",
+                                                                    durationMs = 180000L,
+                                                                ),
+                                                                ReceiptLine(
+                                                                    plays = 1,
+                                                                    title = "Explore music & artists",
+                                                                    artist = "SimpMetro",
+                                                                    durationMs = 200000L,
+                                                                ),
+                                                                ReceiptLine(
+                                                                    plays = 1,
+                                                                    title = "Receipt tracks update live",
+                                                                    artist = "SimpMetro",
+                                                                    durationMs = 240000L,
+                                                                ),
                                                             )
                                                         }
-                                                    } else {
-                                                        listOf(
-                                                            ReceiptLine(plays = 1, title = "Play your first track", artist = "SimpMetro", durationMs = 180000L),
-                                                            ReceiptLine(plays = 1, title = "Explore music & artists", artist = "SimpMetro", durationMs = 200000L),
-                                                            ReceiptLine(plays = 1, title = "Receipt tracks update live", artist = "SimpMetro", durationMs = 240000L),
-                                                        )
                                                     }
-                                                }
                                                 ListeningReceiptView(
                                                     lines = receiptLines,
                                                     periodLabel = statisticsPeriodLabel(state),
@@ -1021,6 +1116,56 @@ private fun StatisticsCarousel(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatisticsRecentSection(
+    items: List<StatisticsRecentItem>,
+    onItemClick: (StatisticsRecentItem) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(Res.string.recently_played),
+            modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() },
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        val size = currentGridThumbnailHeight()
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(GridTileSpacing),
+        ) {
+            items(items, key = { it.id }) { item ->
+                Column(
+                    Modifier
+                        .width(size)
+                        .clickable { onItemClick(item) },
+                ) {
+                    Box(Modifier.size(size)) {
+                        AsyncImage(
+                            item.thumbnailUrl,
+                            Modifier.fillMaxSize(),
+                            shape = RoundedCornerShape(CarouselItemCornerRadius),
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        item.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        item.subtitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

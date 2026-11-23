@@ -11,8 +11,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import com.metrolist.android.LocalMiniPlayerBottomInset
 import com.metrolist.android.playback.LocalPlayerConnection
+import com.metrolist.android.ui.component.tabContentTopPadding
 import com.metrolist.android.ui.menu.AlbumMenu
 import com.metrolist.android.ui.menu.ArtistMenu
 import com.metrolist.android.ui.menu.SongMenu
@@ -39,6 +41,7 @@ import com.metrolist.shared.ui.playback.LocalPlaybackController
 import com.metrolist.shared.ui.screens.StatisticsDetail
 import com.metrolist.shared.ui.screens.StatisticsDetailScreen
 import com.metrolist.shared.ui.screens.StatisticsItem
+import com.metrolist.shared.ui.screens.StatisticsRecentItem
 import com.metrolist.shared.ui.screens.StatisticsScreen
 import com.metrolist.shared.ui.screens.StatisticsUiState
 import com.metrolist.shared.ui.screens.statisticsPlayCountDuration
@@ -62,6 +65,7 @@ fun StatsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val playItem = rememberStatisticsPlaybackAction()
     val openItemMenu = rememberStatisticsItemMenu(uiState, viewModel)
+    val topPadding = if (onNavigateBack == null) tabContentTopPadding() else 0.dp
     StatisticsScreen(
         exportLabel = shareLabel,
         onExport = { shareImage(context, it, shareLabel) },
@@ -79,6 +83,17 @@ fun StatsScreen(
                 tracks = uiState.topSongs.mapIndexed { index, item -> item.toStatisticsItem(index) },
                 albums = uiState.topAlbums.mapIndexed { index, item -> item.toStatisticsItem(index) },
                 artists = uiState.topArtists.mapIndexed { index, item -> item.toStatisticsItem(index) },
+                recentItems =
+                    uiState.recentScrobbles.map { entry ->
+                        StatisticsRecentItem(
+                            id = "recent:${entry.id}",
+                            songId = entry.songId,
+                            title = entry.title,
+                            subtitle = entry.artists,
+                            thumbnailUrl = entry.thumbnailUrl,
+                            timestamp = entry.playedAt,
+                        )
+                    },
                 isLoading = uiState.isLoading,
                 hasLoaded = uiState.hasLoaded,
                 errorMessage = if (uiState.loadFailed) stringResource(Res.string.statistics_load_failed) else null,
@@ -95,6 +110,7 @@ fun StatsScreen(
         onPlayItem = playItem,
         onItemMenu = openItemMenu,
         onNavigateBack = onNavigateBack,
+        topContentPadding = topPadding,
         bottomContentPadding = LocalMiniPlayerBottomInset.current,
     )
 }

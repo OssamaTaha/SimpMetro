@@ -7,13 +7,23 @@
 
 package com.metrolist.shared.ui.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.metrolist.shared.deviceconnect.DcSyncState
@@ -24,8 +34,10 @@ import com.metrolist.shared.deviceconnect.deviceConnectDeviceMetadata
 import com.metrolist.shared.deviceconnect.deviceConnectPeerStatus
 import com.metrolist.shared.generated.resources.*
 import com.metrolist.shared.settings.Settings
+import com.metrolist.shared.sync.CrossDeviceSyncEngine
 import com.metrolist.shared.ui.icons.MetrolistIcons
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 data class DeviceConnectSettingsHost(
@@ -174,6 +186,83 @@ internal fun SettingsUiRegistryBuilder.deviceConnectPage(host: DeviceConnectSett
                     valueLabel = stringResource(Res.string.device_connect_forget),
                     confirmationMessage = stringResource(Res.string.device_connect_forget_message),
                 ) { host.onForget(device.deviceId) }
+            }
+        }
+        group("librarySyncGroup", stringResource(Res.string.library_sync), enabled = enabled) {
+            val syncResult by CrossDeviceSyncEngine.lastSyncResult.collectAsState()
+            val isSyncing by CrossDeviceSyncEngine.isSyncing.collectAsState()
+
+            action(
+                id = "librarySyncSummary",
+                title = stringResource(Res.string.library_sync),
+                description = stringResource(Res.string.library_sync_summary),
+                enabled = false,
+            ) {}
+
+            var syncAddressInput by remember { mutableStateOf("") }
+            val syncScope = rememberCoroutineScope()
+
+            custom("librarySyncCustomDirect", stringResource(Res.string.library_sync)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(Res.string.library_sync_peer_address),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    OutlinedTextField(
+                        value = syncAddressInput,
+                        onValueChange = { syncAddressInput = it },
+                        placeholder = { Text(stringResource(Res.string.library_sync_peer_hint)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Button(
+                        onClick = {
+                            val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke() ?: return@Button
+                            syncScope.launch {
+                                val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                                CrossDeviceSyncEngine.syncWithPeer(
+                                    peerEndpoint = syncAddressInput,
+                                    database = db,
+                                    deviceId = Settings.shared.deviceConnectDeviceId,
+                                    deviceName = Settings.shared.deviceConnectDeviceName,
+                                    downloadedIds = downloaded,
+                                )
+                            }
+                        },
+                        enabled = syncAddressInput.isNotBlank() && !isSyncing,
+                        modifier = Modifier.fillMaxWidth(),
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text(
+                            if (isSyncing) {
+                                stringResource(Res.string.library_sync_syncing)
+                            } else {
+                                stringResource(Res.string.library_sync_connect_and_sync)
+                            },
+                        )
+                    }
+                    if (syncResult != null) {
+                        val res = syncResult!!
+                        if (res.isSuccess) {
+                            Text(
+                                stringResource(
+                                    Res.string.library_sync_success,
+                                    res.songsMerged,
+                                    res.playlistsMerged,
+                                    res.downloadsQueued,
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        } else {
+                            Text(
+                                res.errorMessage ?: stringResource(Res.string.library_sync_failed),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                }
             }
         }
         group("deviceConnectAdvanced", stringResource(Res.string.advanced), enabled = enabled) {

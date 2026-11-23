@@ -13,17 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import com.metrolist.shared.settings.Settings
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -76,6 +75,11 @@ import com.metrolist.shared.generated.resources.queued
 import com.metrolist.shared.generated.resources.remove
 import com.metrolist.shared.generated.resources.retry
 import com.metrolist.shared.generated.resources.see_all
+import com.metrolist.shared.generated.resources.smart_downloads
+import com.metrolist.shared.generated.resources.smart_downloads_description
+import com.metrolist.shared.generated.resources.smart_downloads_sync_now
+import com.metrolist.shared.generated.resources.smart_downloads_syncing
+import com.metrolist.shared.settings.Settings
 import com.metrolist.shared.ui.icons.MetrolistIcons
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -122,21 +126,36 @@ fun DownloadsScreen(onNavigateBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Smart Downloads", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(
-                            "Auto-downloads songs tailored to your taste",
+                            stringResource(Res.string.smart_downloads),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            stringResource(Res.string.smart_downloads_description),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Button(
                         onClick = {
                             syncTriggered = true
-                            com.metrolist.android.playback.smartdownload.SmartDownloadWorker.triggerImmediate(context, Settings.shared.smartDownloadQuota)
+                            com.metrolist.android.playback.smartdownload.SmartDownloadWorker.triggerImmediate(
+                                context,
+                                Settings.shared.smartDownloadQuota,
+                            )
                         },
                         modifier = Modifier.padding(start = 8.dp),
                     ) {
-                        Text(if (syncTriggered) "Syncing…" else "Sync Now")
+                        Text(
+                            if (syncTriggered) {
+                                stringResource(
+                                    Res.string.smart_downloads_syncing,
+                                )
+                            } else {
+                                stringResource(Res.string.smart_downloads_sync_now)
+                            },
+                        )
                     }
                 }
             }

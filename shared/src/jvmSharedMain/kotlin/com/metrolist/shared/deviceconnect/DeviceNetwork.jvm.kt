@@ -7,12 +7,22 @@ import java.net.NetworkInterface
 internal actual fun getLocalIpV4Addresses(): List<String> = deviceConnectLanIpv4Addresses().mapNotNull { it.hostAddress }
 
 internal fun isDeviceConnectLanIpv4(address: Inet4Address): Boolean =
-    !address.isLoopbackAddress && !address.isLinkLocalAddress && address.isSiteLocalAddress
+    !address.isLoopbackAddress && !address.isLinkLocalAddress &&
+        (address.isSiteLocalAddress || isDeviceConnectLanHost(address.hostAddress.orEmpty()))
 
 internal fun deviceConnectLanIpv4Addresses(): List<Inet4Address> = deviceConnectLanAddresses().filterIsInstance<Inet4Address>()
 
 internal fun isDeviceConnectLanAddress(address: InetAddress): Boolean =
     !address.isLoopbackAddress && !address.isMulticastAddress && isDeviceConnectLanHost(address.hostAddress.orEmpty())
+
+internal fun isTailscaleInterface(
+    name: String,
+    displayName: String = name,
+): Boolean {
+    val normalized = name.lowercase()
+    val display = displayName.lowercase()
+    return normalized.startsWith("tailscale") || display.contains("tailscale")
+}
 
 internal fun deviceConnectLanAddresses(): List<InetAddress> =
     runCatching {
@@ -30,11 +40,12 @@ internal fun deviceConnectLanInterfaces(): List<NetworkInterface> =
             .toList()
             .filter {
                 runCatching {
+                    val isTailscale = isTailscaleInterface(it.name, it.displayName.orEmpty())
                     it.isUp &&
                         !it.isLoopback &&
                         !it.isVirtual &&
-                        !it.isPointToPoint &&
-                        it.supportsMulticast() &&
+                        (!it.isPointToPoint || isTailscale) &&
+                        (it.supportsMulticast() || isTailscale) &&
                         isDeviceConnectLanInterfaceName(it.name, it.displayName.orEmpty())
                 }.getOrDefault(false)
             }
@@ -44,6 +55,7 @@ internal fun isDeviceConnectLanInterfaceName(
     name: String,
     displayName: String = name,
 ): Boolean {
+    if (isTailscaleInterface(name, displayName)) return true
     val normalized = name.lowercase()
     return listOf("br-", "docker", "veth", "tun", "utun", "tap", "ppp", "vpn", "wg", "awdl", "llw", "anpi", "bridge")
         .none(normalized::startsWith) &&

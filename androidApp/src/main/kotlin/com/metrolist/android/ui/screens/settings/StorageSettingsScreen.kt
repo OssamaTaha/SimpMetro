@@ -94,10 +94,16 @@ import com.metrolist.shared.generated.resources.music_video_quality
 import com.metrolist.shared.generated.resources.music_video_quality_auto
 import com.metrolist.shared.generated.resources.music_video_quality_desc
 import com.metrolist.shared.generated.resources.music_video_quality_resolution
+import com.metrolist.shared.generated.resources.n_song
 import com.metrolist.shared.generated.resources.ok
 import com.metrolist.shared.generated.resources.retry
 import com.metrolist.shared.generated.resources.select_download_directory
 import com.metrolist.shared.generated.resources.settings_download_folder_summary
+import com.metrolist.shared.generated.resources.smart_download_quota
+import com.metrolist.shared.generated.resources.smart_download_wifi_only
+import com.metrolist.shared.generated.resources.smart_download_wifi_only_description
+import com.metrolist.shared.generated.resources.smart_downloads
+import com.metrolist.shared.generated.resources.smart_downloads_description
 import com.metrolist.shared.generated.resources.song_cache
 import com.metrolist.shared.generated.resources.song_cache_directory
 import com.metrolist.shared.generated.resources.song_cache_location
@@ -129,6 +135,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import timber.log.Timber
@@ -802,8 +809,8 @@ fun StorageSettingsScreen(
                     SettingsSubScreenItemRow(
                         item =
                             switchSettingsItem(
-                                title = "Smart Downloads",
-                                description = "Automatically download music matching your taste in the background when connected to Wi-Fi & charging",
+                                title = stringResource(Res.string.smart_downloads),
+                                description = stringResource(Res.string.smart_downloads_description),
                                 checked = smartDownloadEnabled,
                                 onCheckedChange = { checked ->
                                     Settings.shared.smartDownloadEnabled = checked
@@ -826,11 +833,11 @@ fun StorageSettingsScreen(
                         SettingsSubScreenItemRow(
                             item =
                                 listChooserSettingsItem(
-                                    title = "Smart Download Quota",
-                                    description = "$smartDownloadQuota songs",
+                                    title = stringResource(Res.string.smart_download_quota),
+                                    description = pluralStringResource(Res.plurals.n_song, smartDownloadQuota, smartDownloadQuota),
                                     options = listOf(50, 100, 200, 500),
                                     selectedOption = smartDownloadQuota,
-                                    optionToString = { "$it songs" },
+                                    optionToString = { count -> pluralStringResource(Res.plurals.n_song, count, count) },
                                     onOptionSelected = { quota ->
                                         Settings.shared.smartDownloadQuota = quota
                                         smartDownloadQuota = quota
@@ -847,8 +854,8 @@ fun StorageSettingsScreen(
                         SettingsSubScreenItemRow(
                             item =
                                 switchSettingsItem(
-                                    title = "Download only on Wi-Fi",
-                                    description = "Prevent mobile data consumption for background offline syncing",
+                                    title = stringResource(Res.string.smart_download_wifi_only),
+                                    description = stringResource(Res.string.smart_download_wifi_only_description),
                                     checked = smartDownloadWifiOnly,
                                     onCheckedChange = { wifiOnly ->
                                         Settings.shared.smartDownloadWifiOnly = wifiOnly

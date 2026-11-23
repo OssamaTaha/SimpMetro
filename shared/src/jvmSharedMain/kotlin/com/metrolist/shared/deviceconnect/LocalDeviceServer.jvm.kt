@@ -7,12 +7,20 @@
 
 package com.metrolist.shared.deviceconnect
 
+import com.metrolist.shared.settings.Settings
+import com.metrolist.shared.sync.CrossDeviceSyncEngine
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.install
 import io.ktor.server.application.serverConfig
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.request.receiveText
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.DefaultWebSocketServerSession
 import io.ktor.server.websocket.WebSockets
@@ -65,6 +73,29 @@ actual class LocalDeviceServer {
                                 return@webSocket
                             }
                             onChannel(channel)
+                        }
+                        post("/sync/v1") {
+                            val clientAddress = call.request.local.remoteAddress
+                            if (!isDeviceConnectAllowedClientAddress(clientAddress)) {
+                                call.respond(HttpStatusCode.Forbidden, "Forbidden")
+                                return@post
+                            }
+                            val incomingText = call.receiveText()
+                            val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke()
+                            if (db == null) {
+                                call.respond(HttpStatusCode.ServiceUnavailable, "Database unavailable")
+                                return@post
+                            }
+                            val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                            val responseText =
+                                CrossDeviceSyncEngine.handleIncomingSync(
+                                    incomingJson = incomingText,
+                                    database = db,
+                                    deviceId = Settings.shared.deviceConnectDeviceId,
+                                    deviceName = Settings.shared.deviceConnectDeviceName,
+                                    downloadedIds = downloaded,
+                                )
+                            call.respondText(responseText, ContentType.Application.Json)
                         }
                     }
                 }

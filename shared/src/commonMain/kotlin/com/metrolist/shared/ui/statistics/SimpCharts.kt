@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -12,7 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +32,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.metrolist.shared.generated.resources.Res
+import com.metrolist.shared.generated.resources.music_taste_title
+import com.metrolist.shared.generated.resources.n_time
+import com.metrolist.shared.generated.resources.peak_listening_hour
+import com.metrolist.shared.generated.resources.plays_in_peak_hour
+import com.metrolist.shared.ui.icons.MetrolistIcons
+import com.metrolist.shared.ui.screens.StatisticsItem
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -77,8 +92,184 @@ fun calculateFingerprint(
         discovery = discovery,
         diversity = diversity,
         concentration = concentration,
-        replay = replay
+        replay = replay,
     )
+}
+
+/**
+ * Synthesized taste analysis modeled after SimpMusic's "What's your music taste?" feature.
+ */
+data class MusicTasteProfile(
+    val personalityTitle: String,
+    val description: String,
+    val tags: List<String>,
+    val energyLevel: String,
+    val listeningVibe: String,
+)
+
+/**
+ * Calculates behavioral taste metrics & insights based on local playback history totals.
+ */
+fun calculateMusicTasteProfile(
+    totalPlays: Int,
+    distinctArtists: Int,
+    tracks: List<StatisticsItem>,
+    artists: List<StatisticsItem>,
+    hourlyStats: Map<Int, Int>,
+    dailyStats: Map<String, Int>,
+): MusicTasteProfile {
+    val fingerprint = calculateFingerprint(totalPlays, distinctArtists, tracks.size, hourlyStats, dailyStats)
+    val peakHour = (0..23).maxByOrNull { hourlyStats[it] ?: 0 } ?: 14
+    val topArtistName = artists.firstOrNull()?.title
+
+    if (totalPlays <= 0) {
+        return MusicTasteProfile(
+            personalityTitle = "Curious Explorer",
+            description =
+                "Start listening to songs and building your library in SimpMetro to unlock your " +
+                    "on-device Taste Profile, behavioral fingerprint, and personalized AI insights.",
+            tags = listOf("#NewListener", "#FreshStart", "#DiscoveryAwaits"),
+            energyLevel = "Dynamic",
+            listeningVibe = "Fresh Canvas",
+        )
+    }
+
+    val personalityTitle =
+        when {
+            fingerprint.discovery > 0.65f -> "Sonic Explorer"
+            fingerprint.replay > 0.70f -> "Devoted Obsessive"
+            peakHour in 0..5 -> "Late-Night Melophile"
+            peakHour in 6..11 -> "Morning Energizer"
+            fingerprint.diversity > 0.65f -> "Eclectic Nomad"
+            fingerprint.concentration > 0.50f -> "Artist Disciple"
+            else -> "Harmonic Wanderer"
+        }
+
+    val energyLevel =
+        when {
+            peakHour in 22..23 || peakHour in 0..5 -> "Deep Night Chill"
+            peakHour in 6..12 -> "Vibrant Morning Flow"
+            peakHour in 13..17 -> "Focused Afternoon Momentum"
+            else -> "Evening Golden Groove"
+        }
+
+    val listeningVibe =
+        when {
+            fingerprint.replay > 0.65f -> "High-Rotation Obsessions"
+            fingerprint.discovery > 0.60f -> "Adventurous Discovery"
+            fingerprint.diversity > 0.60f -> "Multi-Genre Spectrum"
+            else -> "Balanced Melody"
+        }
+
+    val tags = mutableListOf<String>()
+    if (fingerprint.discovery > 0.45f) tags.add("#DiscoveryDriven")
+    if (fingerprint.replay > 0.55f) tags.add("#HeavyRotation")
+    if (fingerprint.diversity > 0.50f) tags.add("#EclecticPalette")
+    if (fingerprint.consistency > 0.60f) tags.add("#DailyHabit")
+    if (peakHour in 22..23 || peakHour in 0..5) tags.add("#LateNight")
+    if (peakHour in 6..12) tags.add("#MorningRhythm")
+    if (tags.size < 3) tags.add("#PersonalTaste")
+    if (tags.size < 3) tags.add("#MusicLover")
+
+    val artistMention =
+        if (!topArtistName.isNullOrBlank()) {
+            "immersed in $topArtistName and similar favorites"
+        } else {
+            "exploring diverse tracks"
+        }
+    val peakStr = hourLabel(peakHour)
+    val discoveryPct = (fingerprint.discovery * 100).toInt()
+    val consistencyPct = (fingerprint.consistency * 100).toInt()
+
+    val description =
+        "Your listening fingerprint highlights $listeningVibe with $discoveryPct% new discovery " +
+            "and $consistencyPct% listening consistency. You peak around $peakStr, $artistMention."
+
+    return MusicTasteProfile(
+        personalityTitle = personalityTitle,
+        description = description,
+        tags = tags.take(4),
+        energyLevel = energyLevel,
+        listeningVibe = listeningVibe,
+    )
+}
+
+/**
+ * Visual taste card prominently displayed at the top of Dashboard.
+ */
+@Composable
+fun MusicTasteCard(
+    profile: MusicTasteProfile,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = MetrolistIcons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = stringResource(Res.string.music_taste_title).uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            Text(
+                text = profile.personalityTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+
+            Text(
+                text = profile.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.88f),
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 4.dp),
+            ) {
+                profile.tags.forEach { tag ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.70f),
+                    ) {
+                        Text(
+                            text = tag,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -100,7 +291,7 @@ fun ListeningClockChart(
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Canvas(Modifier.size(diameter)) {
             val outer = size.minDimension / 2f
@@ -119,31 +310,31 @@ fun ListeningClockChart(
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "Peak Listening Hour",
+                text = stringResource(Res.string.peak_listening_hour),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                maxLines = 1,
             )
             Text(
                 text = "${hourLabel(peak)} – ${hourLabel((peak + 1) % 24)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
+                maxLines = 1,
             )
             Text(
-                text = "Plays in peak hour",
+                text = stringResource(Res.string.plays_in_peak_hour),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 6.dp),
             )
             Text(
-                text = "${hours[peak]} listens",
+                text = pluralStringResource(Res.plurals.n_time, hours[peak], hours[peak]),
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
-                maxLines = 1
+                maxLines = 1,
             )
         }
     }
@@ -158,19 +349,20 @@ private fun DrawScope.drawWedge(
     sweepDeg: Float,
     color: Color,
 ) {
-    val path = Path().apply {
-        val steps = 6
-        repeat(steps + 1) { i ->
-            val a = ((startDeg + sweepDeg * i / steps) * PI / 180f).toFloat()
-            val p = Offset(center.x + cos(a) * outer, center.y + sin(a) * outer)
-            if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+    val path =
+        Path().apply {
+            val steps = 6
+            repeat(steps + 1) { i ->
+                val a = ((startDeg + sweepDeg * i / steps) * PI / 180f).toFloat()
+                val p = Offset(center.x + cos(a) * outer, center.y + sin(a) * outer)
+                if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+            }
+            for (i in steps downTo 0) {
+                val a = ((startDeg + sweepDeg * i / steps) * PI / 180f).toFloat()
+                lineTo(center.x + cos(a) * inner, center.y + sin(a) * inner)
+            }
+            close()
         }
-        for (i in steps downTo 0) {
-            val a = ((startDeg + sweepDeg * i / steps) * PI / 180f).toFloat()
-            lineTo(center.x + cos(a) * inner, center.y + sin(a) * inner)
-        }
-        close()
-    }
     drawPath(path, color)
 }
 
@@ -192,10 +384,11 @@ fun FingerprintChart(
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Canvas(Modifier.size(diameter)) {
             val radius = size.minDimension / 2f * 0.76f
+
             fun ring(fraction: Float) = polygonPath(center, radius * fraction, 5)
             listOf(0.33f, 0.66f, 1f).forEach { drawPath(ring(it), gridColor, style = Stroke(1.5f)) }
             repeat(5) { i ->
@@ -212,19 +405,19 @@ fun FingerprintChart(
             labels.forEachIndexed { i, label ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.width(76.dp)
+                        modifier = Modifier.width(76.dp),
                     )
                     Text(
                         text = "${(current.axes[i] * 100).toInt()}%",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -247,25 +440,27 @@ private fun polygonPath(
     center: Offset,
     radius: Float,
     sides: Int,
-): Path = Path().apply {
-    repeat(sides) { i ->
-        val p = axisPoint(center, radius, i, sides, 1f)
-        if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+): Path =
+    Path().apply {
+        repeat(sides) { i ->
+            val p = axisPoint(center, radius, i, sides, 1f)
+            if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+        }
+        close()
     }
-    close()
-}
 
 private fun valuePath(
     center: Offset,
     radius: Float,
     values: List<Float>,
-): Path = Path().apply {
-    values.forEachIndexed { i, v ->
-        val p = axisPoint(center, radius, i, values.size, v.coerceIn(0f, 1f))
-        if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+): Path =
+    Path().apply {
+        values.forEachIndexed { i, v ->
+            val p = axisPoint(center, radius, i, values.size, v.coerceIn(0f, 1f))
+            if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+        }
+        close()
     }
-    close()
-}
 
 private fun hourLabel(hour: Int): String = "${hour.toString().padStart(2, '0')}:00"
 
@@ -291,41 +486,46 @@ fun ListeningReceiptView(
     totalTimeMs: Long,
     modifier: Modifier = Modifier,
 ) {
-    val monoStyle = MaterialTheme.typography.bodySmall.copy(
-        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-        fontWeight = FontWeight.Medium
-    )
+    val monoStyle =
+        MaterialTheme.typography.bodySmall.copy(
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontWeight = FontWeight.Medium,
+        )
     val paperColor = MaterialTheme.colorScheme.surfaceContainerHighest
     val inkColor = MaterialTheme.colorScheme.onSurface
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-            .background(paperColor)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clip(
+                    androidx.compose.foundation.shape
+                        .RoundedCornerShape(8.dp),
+                ).background(paperColor)
+                .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = "SIMPMETRO",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                fontWeight = FontWeight.Black
-            ),
-            color = inkColor
+            style =
+                MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontWeight = FontWeight.Black,
+                ),
+            color = inkColor,
         )
         Text(
             text = periodLabel.uppercase(),
             style = monoStyle.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
 
         DashedReceiptDivider()
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("QTY", style = monoStyle.copy(fontWeight = FontWeight.Bold), color = inkColor)
             Text("TRACK", style = monoStyle.copy(fontWeight = FontWeight.Bold), color = inkColor)
@@ -337,13 +537,13 @@ fun ListeningReceiptView(
         lines.take(10).forEach { line ->
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "${line.plays}x",
                     style = monoStyle,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.width(36.dp)
+                    modifier = Modifier.width(36.dp),
                 )
                 Text(
                     text = "${line.title} - ${line.artist}".uppercase(),
@@ -351,12 +551,12 @@ fun ListeningReceiptView(
                     color = inkColor,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                 )
                 Text(
                     text = formatDuration(line.durationMs),
                     style = monoStyle,
-                    color = inkColor
+                    color = inkColor,
                 )
             }
         }
@@ -365,17 +565,21 @@ fun ListeningReceiptView(
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("ITEM COUNT:", style = monoStyle.copy(fontWeight = FontWeight.Bold), color = inkColor)
             Text("$totalPlays", style = monoStyle.copy(fontWeight = FontWeight.Bold), color = inkColor)
         }
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text("TOTAL TIME:", style = monoStyle.copy(fontWeight = FontWeight.Bold), color = inkColor)
-            Text(formatDuration(totalTimeMs), style = monoStyle.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.primary)
+            Text(
+                formatDuration(totalTimeMs),
+                style = monoStyle.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         DashedReceiptDivider()
@@ -385,7 +589,7 @@ fun ListeningReceiptView(
             text = "THANK YOU FOR LISTENING",
             style = monoStyle.copy(fontWeight = FontWeight.Bold),
             color = inkColor,
-            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
         )
         ReceiptBarcode(modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
     }
@@ -400,7 +604,9 @@ private fun DashedReceiptDivider() {
             start = Offset(0f, 0f),
             end = Offset(size.width, 0f),
             strokeWidth = 2f,
-            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 6f))
+            pathEffect =
+                androidx.compose.ui.graphics.PathEffect
+                    .dashPathEffect(floatArrayOf(8f, 6f)),
         )
     }
 }
@@ -418,7 +624,7 @@ private fun ReceiptBarcode(modifier: Modifier = Modifier) {
                     color = barColor,
                     start = Offset(i * spacing, 0f),
                     end = Offset(i * spacing, size.height),
-                    strokeWidth = thickness
+                    strokeWidth = thickness,
                 )
             }
         }

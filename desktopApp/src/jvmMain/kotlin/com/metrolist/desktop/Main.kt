@@ -167,6 +167,7 @@ import com.metrolist.shared.api.lastfm.LastFM
 import com.metrolist.shared.auth.YouTubeSessionState
 import com.metrolist.shared.db.DatabaseDowngradeException
 import com.metrolist.shared.db.MusicDatabase
+import com.metrolist.shared.db.entities.toSongItem
 import com.metrolist.shared.discord.DiscordRpcManager
 import com.metrolist.shared.discord.observeDiscordInitialization
 import com.metrolist.shared.generated.resources.Res
@@ -208,6 +209,7 @@ import com.metrolist.shared.state.SongLikeState
 import com.metrolist.shared.state.SongMetadataState
 import com.metrolist.shared.state.applyContentRegion
 import com.metrolist.shared.state.coreModule
+import com.metrolist.shared.sync.CrossDeviceSyncEngine
 import com.metrolist.shared.ui.YouTubeSyncSnackbar
 import com.metrolist.shared.ui.components.AlertDialog
 import com.metrolist.shared.ui.components.HomeLoadingPlaceholder
@@ -999,6 +1001,24 @@ private fun runDesktopApp(args: Array<String>) {
             runBlocking { SongLikeState.recoverDatabaseLikes(database) }
             DesktopAutomaticBackupScheduler.start(applicationScope)
             SongMetadataState.bind(database, applicationScope)
+            CrossDeviceSyncEngine.localDatabaseProvider = { database }
+            CrossDeviceSyncEngine.localDownloadsProvider = {
+                DownloadManager.downloadStates.value
+                    .filterValues { it == DownloadState.DOWNLOADED }
+                    .keys
+                    .toList()
+            }
+            CrossDeviceSyncEngine.onNewDownloadsRequested = { songIds ->
+                applicationScope.launch(Dispatchers.IO) {
+                    val songs =
+                        songIds.mapNotNull { id ->
+                            database.dao().getSongById(id)?.toSongItem()
+                        }
+                    if (songs.isNotEmpty()) {
+                        DownloadManager.downloadAll(songs)
+                    }
+                }
+            }
 
             LastFM.initialize(
                 apiKey = BuildConfig.LASTFM_API_KEY,

@@ -135,7 +135,9 @@ internal class ExtractionCooldown(
 }
 
 // InnerTubeX catches ordinary failures to try another client; cancellation must escape that loop.
-internal class ExtractionDeferred(message: String = "Extraction deferred") : CancellationException(message) {
+internal class ExtractionDeferred(
+    message: String = "Extraction deferred",
+) : CancellationException(message) {
     val failure = StreamResolveException(StreamResolveException.Reason.NETWORK, "Unable to fetch stream data from YouTube.")
 }
 

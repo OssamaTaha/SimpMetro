@@ -10,6 +10,31 @@
     <!-- Translators: Label for app name in the multiple app screens. -->
     <string name="app_name" translatable="false">SimpMetro</string>
     <string name="dashboard" translatable="false">Dashboard</string>
+    <string name="music_taste_title">What\'s your music taste?</string>
+    <string name="music_taste_subtitle">On-device taste insights &amp; personality</string>
+    <string name="music_taste_personality">Listening Vibe</string>
+    <string name="recently_played">Recently played</string>
+    <string name="library_sync">Library &amp; Device Sync</string>
+    <string name="library_sync_summary">Sync library, playlists, downloads, and history across devices via Tailscale or Wi-Fi</string>
+    <string name="library_sync_now">Sync Now</string>
+    <string name="library_sync_syncing">Syncing with paired device…</string>
+    <string name="library_sync_peer_address">Device Address (Tailscale or LAN)</string>
+    <string name="library_sync_peer_hint">e.g. 100.100.24.47:48517</string>
+    <string name="library_sync_connect_and_sync">Connect &amp; Sync</string>
+    <string name="library_sync_success">Synced %1$d items, %2$d playlists, and %3$d downloads</string>
+    <string name="library_sync_failed">Device sync failed. Check Tailscale connection and try again.</string>
+    <string name="smart_downloads">Smart Downloads</string>
+    <string name="smart_downloads_description">Auto-downloads songs tailored to your taste and playlists</string>
+    <string name="smart_downloads_sync_now">Sync Now</string>
+    <string name="smart_downloads_syncing">Syncing…</string>
+    <string name="smart_download_quota">Smart Download Quota</string>
+    <string name="smart_download_wifi_only">Download only on Wi-Fi</string>
+    <string name="smart_download_wifi_only_description">Prevent mobile data consumption for background offline syncing</string>
+    <string name="listening_clock">Listening Clock</string>
+    <string name="listening_fingerprint">Listening Fingerprint</string>
+    <string name="listening_receipt">Listening Receipt</string>
+    <string name="peak_listening_hour">Peak Listening Hour</string>
+    <string name="plays_in_peak_hour">Plays in peak hour</string>
     <string name="account_menu_license" translatable="false">GPL-3.0 MetrolistGroup</string>
     <!-- Translators: Apple mobile platform name displayed in application information. -->
     <!-- Translators: Navigation label for home in the multiple app screens. -->

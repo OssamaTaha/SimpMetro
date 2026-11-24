@@ -264,7 +264,7 @@ android {
         applicationId = "com.simpmetro.music"
         minSdk = 24
         targetSdk = 35
-        versionCode = 158
+        versionCode = 159
         versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -8,11 +8,14 @@
 package com.metrolist.shared.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -24,7 +27,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.metrolist.shared.deviceconnect.DcSyncState
 import com.metrolist.shared.deviceconnect.DeviceConnectDirectConnection
@@ -35,6 +40,7 @@ import com.metrolist.shared.deviceconnect.deviceConnectPeerStatus
 import com.metrolist.shared.generated.resources.*
 import com.metrolist.shared.settings.Settings
 import com.metrolist.shared.sync.CrossDeviceSyncEngine
+import com.metrolist.shared.ui.components.QrCodeView
 import com.metrolist.shared.ui.icons.MetrolistIcons
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -52,6 +58,8 @@ data class DeviceConnectSettingsHost(
     val onPair: (String) -> Unit,
     val onCancelPairing: (String) -> Unit,
     val onForget: (String) -> Unit,
+    val onScanQr: (((String) -> Unit) -> Unit)? = null,
+    val onPasteAddress: (() -> String?)? = null,
 )
 
 @Composable
@@ -188,32 +196,115 @@ internal fun SettingsUiRegistryBuilder.deviceConnectPage(host: DeviceConnectSett
                 ) { host.onForget(device.deviceId) }
             }
         }
-        group("librarySyncGroup", stringResource(Res.string.library_sync), enabled = enabled) {
+        group("librarySyncGroup", stringResource(Res.string.library_sync)) {
             val syncResult by CrossDeviceSyncEngine.lastSyncResult.collectAsState()
             val isSyncing by CrossDeviceSyncEngine.isSyncing.collectAsState()
 
-            action(
-                id = "librarySyncSummary",
-                title = stringResource(Res.string.library_sync),
-                description = stringResource(Res.string.library_sync_summary),
-                enabled = false,
-            ) {}
-
             var syncAddressInput by remember { mutableStateOf("") }
+            var showQrCode by remember { mutableStateOf(false) }
             val syncScope = rememberCoroutineScope()
 
-            custom("librarySyncCustomDirect", stringResource(Res.string.library_sync)) {
-                val localEndpoints = remember {
-                    CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
+            fun triggerSync(endpoint: String) {
+                val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke() ?: return
+                syncScope.launch {
+                    val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                    CrossDeviceSyncEngine.syncWithPeer(
+                        peerEndpoint = endpoint,
+                        database = db,
+                        deviceId = Settings.shared.deviceConnectDeviceId,
+                        deviceName = Settings.shared.deviceConnectDeviceName,
+                        downloadedIds = downloaded,
+                    )
                 }
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (localEndpoints.isNotEmpty()) {
+            }
+
+            custom("librarySyncCustomDirect", stringResource(Res.string.library_sync)) {
+                val localEndpoints =
+                    remember {
+                        CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
+                    }
+                val primaryEndpoint = localEndpoints.firstOrNull()
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(Res.string.library_sync_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (primaryEndpoint != null) {
                         Text(
-                            "This Device Address: ${localEndpoints.first()}",
+                            stringResource(Res.string.library_sync_host_address, primaryEndpoint),
                             style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
                         )
+                        if (localEndpoints.size > 1) {
+                            Text(
+                                stringResource(
+                                    Res.string.library_sync_other_ips,
+                                    localEndpoints.drop(1).joinToString(", "),
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (host.onScanQr != null) {
+                            Button(
+                                onClick = {
+                                    host.onScanQr.invoke { decoded ->
+                                        syncAddressInput = decoded
+                                        triggerSync(decoded)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
+                                Text(stringResource(Res.string.library_sync_scan_qr), maxLines = 1)
+                            }
+                        }
+                        if (host.onPasteAddress != null) {
+                            Button(
+                                onClick = {
+                                    host.onPasteAddress.invoke()?.let { syncAddressInput = it }
+                                },
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
+                                Text(stringResource(Res.string.library_sync_paste), maxLines = 1)
+                            }
+                        }
+                        if (primaryEndpoint != null) {
+                            Button(
+                                onClick = { showQrCode = !showQrCode },
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
+                                Text(
+                                    if (showQrCode) {
+                                        stringResource(Res.string.library_sync_hide_qr)
+                                    } else {
+                                        stringResource(Res.string.library_sync_show_qr)
+                                    },
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+
+                    if (showQrCode && primaryEndpoint != null) {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            QrCodeView(content = primaryEndpoint, sizeDp = 180.dp)
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+
                     Text(
                         stringResource(Res.string.library_sync_peer_address),
                         style = MaterialTheme.typography.titleMedium,
@@ -226,19 +317,7 @@ internal fun SettingsUiRegistryBuilder.deviceConnectPage(host: DeviceConnectSett
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Button(
-                        onClick = {
-                            val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke() ?: return@Button
-                            syncScope.launch {
-                                val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
-                                CrossDeviceSyncEngine.syncWithPeer(
-                                    peerEndpoint = syncAddressInput,
-                                    database = db,
-                                    deviceId = Settings.shared.deviceConnectDeviceId,
-                                    deviceName = Settings.shared.deviceConnectDeviceName,
-                                    downloadedIds = downloaded,
-                                )
-                            }
-                        },
+                        onClick = { triggerSync(syncAddressInput) },
                         enabled = syncAddressInput.isNotBlank() && !isSyncing,
                         modifier = Modifier.fillMaxWidth(),
                         shapes = ButtonDefaults.shapes(),

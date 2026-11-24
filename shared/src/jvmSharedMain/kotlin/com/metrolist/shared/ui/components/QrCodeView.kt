@@ -24,12 +24,12 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 
 @Composable
-fun QrCodeView(
+actual fun QrCodeView(
     content: String,
-    modifier: Modifier = Modifier,
-    sizeDp: Dp = 200.dp,
-    backgroundColor: Color = Color.White,
-    codeColor: Color = Color.Black,
+    modifier: Modifier,
+    sizeDp: Dp,
+    backgroundColor: Color,
+    codeColor: Color,
 ) {
     val bitMatrix = remember(content) {
         runCatching {

@@ -9,8 +9,12 @@
 
 package com.metrolist.android.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -29,11 +33,18 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import com.metrolist.android.deviceconnect.AndroidDeviceConnect
 import com.metrolist.android.playback.LocalPlayerConnection
 import com.metrolist.android.ui.component.AdaptiveModalBottomSheet
+import com.metrolist.android.ui.components.QrCameraScannerDialog
+import com.metrolist.android.ui.components.QrDecoder
 import com.metrolist.shared.cast.CastState
+import com.metrolist.shared.generated.resources.Res
+import com.metrolist.shared.generated.resources.library_sync_camera_denied
+import com.metrolist.shared.generated.resources.library_sync_clipboard_empty
+import com.metrolist.shared.generated.resources.library_sync_qr_not_found
 import com.metrolist.shared.settings.Settings
 import com.metrolist.shared.ui.components.ConnectedDevicesContent
 import com.metrolist.shared.ui.settings.DeviceConnectSettingsHost
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
 import com.metrolist.shared.ui.components.rememberModalSheetState as rememberBottomSheetState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,6 +131,46 @@ fun rememberDeviceConnectSettingsHost(): DeviceConnectSettingsHost {
     LaunchedEffect(Settings.shared.deviceConnectEnabled) {
         if (Settings.shared.deviceConnectEnabled) manager.refreshPairingState()
     }
+    var showQrScanner by remember { mutableStateOf(false) }
+    var pendingQrCallback by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    val qrNotFoundMessage = stringResource(Res.string.library_sync_qr_not_found)
+    val cameraDeniedMessage = stringResource(Res.string.library_sync_camera_denied)
+    val clipboardEmptyMessage = stringResource(Res.string.library_sync_clipboard_empty)
+
+    val qrImagePicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                val decoded = QrDecoder.decodeUri(context, uri)
+                if (decoded != null) {
+                    pendingQrCallback?.invoke(decoded)
+                    pendingQrCallback = null
+                } else {
+                    Toast.makeText(context, qrNotFoundMessage, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                showQrScanner = true
+            } else {
+                Toast.makeText(context, cameraDeniedMessage, Toast.LENGTH_SHORT).show()
+            }
+        }
+    if (showQrScanner) {
+        QrCameraScannerDialog(
+            onQrDecoded = { decoded ->
+                showQrScanner = false
+                pendingQrCallback?.invoke(decoded)
+                pendingQrCallback = null
+            },
+            onPickFromGallery = { qrImagePicker.launch("image/*") },
+            onDismiss = {
+                showQrScanner = false
+                pendingQrCallback = null
+            },
+        )
+    }
     return DeviceConnectSettingsHost(
         state = manager.state,
         playbackState = manager.remote.state,
@@ -140,5 +191,22 @@ fun rememberDeviceConnectSettingsHost(): DeviceConnectSettingsHost {
         onPair = manager::pair,
         onCancelPairing = manager::rejectPairing,
         onForget = { id -> scope.launch { manager.forget(id) } },
+        onScanQr = { callback ->
+            pendingQrCallback = callback
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                showQrScanner = true
+            } else {
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        },
+        onPasteAddress = {
+            val clip = QrDecoder.getClipboardEndpoint(context)
+            if (clip == null) {
+                Toast.makeText(context, clipboardEmptyMessage, Toast.LENGTH_SHORT).show()
+            }
+            clip
+        },
     )
 }

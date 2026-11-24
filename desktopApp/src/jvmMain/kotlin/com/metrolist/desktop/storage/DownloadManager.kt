@@ -202,7 +202,7 @@ object DownloadManager {
             expectSuccess = false
         }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val downloadSemaphore = Semaphore(6)
+    private val downloadSemaphore = Semaphore(2)
     private val transcodeSemaphore = Semaphore(2)
     private val enrichmentSemaphore = Semaphore(6)
     private val activeJobs = ConcurrentHashMap<String, Job>()
@@ -940,7 +940,7 @@ object DownloadManager {
                     audioPath?.let { safePersistedFile(it)?.delete() }
                     thumbnailPath?.let { safePersistedFile(it)?.delete() }
                     failed = true
-                    println("[DownloadManager] Download failed for ${song.id}: ${e.message}")
+                    AppLogger.warning("DownloadManager", "Download failed for ${song.id}: ${e.message}", e)
                 } finally {
                     synchronized(metadataLock) {
                         if (activeJobs.remove(song.id, coroutineContext[Job])) {

@@ -30,10 +30,12 @@ import java.io.File
 
 /**
  * Desktop Smart Download Engine: Automatically keeps an offline mix of music
- * personalized to the user's taste (combining Dashboard Most Played history,
- * User Playlists, Liked Songs, and user-seeded Radio recommendations).
+ * personalized to the user's taste (Dashboard Most Played history, Liked Songs,
+ * taste-seeded Radio recommendations, and optionally user playlists).
  */
 object DesktopSmartDownloadManager {
+    private const val MAX_BATCH_PER_SYNC = 25
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
@@ -43,8 +45,7 @@ object DesktopSmartDownloadManager {
         if (periodicJob != null) return
         periodicJob =
             scope.launch(Dispatchers.IO) {
-                // Initial delay to avoid slowing down app startup
-                delay(15_000)
+                delay(30_000)
                 while (isActive) {
                     if (Settings.shared.smartDownloadEnabled) {
                         runCatching {
@@ -54,35 +55,87 @@ object DesktopSmartDownloadManager {
                             )
                         }
                     }
-                    // Run every 4 hours while app is open
                     delay(4 * 60 * 60 * 1000L)
                 }
             }
     }
 
-    suspend fun resolveCandidates(targetCount: Int = 0): List<SongItem> =
+    private fun readSmartIds(): MutableList<String> =
+        Settings.shared.smartDownloadedSongIds
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
+
+    private fun saveSmartIds(ids: List<String>) {
+        Settings.shared.smartDownloadedSongIds = ids.distinct().joinToString(",")
+    }
+
+    suspend fun pruneToQuota(
+        quota: Int = Settings.shared.smartDownloadQuota,
+        maxStorageLimitGb: Int = Settings.shared.smartDownloadStorageLimitGb,
+    ): Int =
+        withContext(Dispatchers.IO) {
+            val smartIds = readSmartIds()
+            if (smartIds.isEmpty()) return@withContext 0
+
+            val downloadedById = DownloadManager.downloadedFiles.value.associateBy { it.songId }
+            val activeSmartIds = smartIds.filter { it in downloadedById }.toMutableList()
+            val toDelete = mutableListOf<String>()
+
+            if (quota > 0 && activeSmartIds.size > quota) {
+                val excessCount = activeSmartIds.size - quota
+                val trimmed = activeSmartIds.take(excessCount)
+                toDelete.addAll(trimmed)
+                activeSmartIds.removeAll(trimmed.toSet())
+            }
+
+            val maxAllowedBytes = maxStorageLimitGb.toLong() * 1024L * 1024L * 1024L
+            var currentDownloadSizeBytes =
+                DownloadManager.downloadedFiles.value.sumOf {
+                    File(it.audioFilePath).length() + (it.thumbnailFilePath?.let { path -> File(path).length() } ?: 0L)
+                }
+            while (currentDownloadSizeBytes > maxAllowedBytes && activeSmartIds.isNotEmpty()) {
+                val oldestId = activeSmartIds.removeAt(0)
+                val file = downloadedById[oldestId]
+                val fileSize =
+                    if (file != null) {
+                        File(file.audioFilePath).length() + (file.thumbnailFilePath?.let { path -> File(path).length() } ?: 0L)
+                    } else {
+                        0L
+                    }
+                toDelete.add(oldestId)
+                currentDownloadSizeBytes = (currentDownloadSizeBytes - fileSize).coerceAtLeast(0L)
+            }
+
+            if (toDelete.isNotEmpty()) {
+                DownloadManager.deleteDownloadsAndAwait(toDelete)
+            }
+            saveSmartIds(activeSmartIds)
+            toDelete.size
+        }
+
+    suspend fun resolveCandidates(
+        targetCount: Int = 0,
+        includePlaylists: Boolean = Settings.shared.smartDownloadIncludePlaylists,
+    ): List<SongItem> =
         withContext(Dispatchers.IO) {
             val database = GlobalContext.get().getOrNull<MusicDatabase>() ?: return@withContext emptyList()
             val isUnlimited = targetCount <= 0
             val count = if (isUnlimited) 5000 else targetCount.coerceIn(20, 5000)
             val candidateList = mutableListOf<SongItem>()
 
-            // 1. User Playlists
+            // 1. Most Played tracks from playback history (Dashboard stats)
             try {
-                val playlists = database.dao().playlists(PlaylistSortType.CREATE_DATE, descending = true).first()
-                for (playlist in playlists.take(30)) {
-                    val pSongs =
-                        database
-                            .dao()
-                            .playlistSongs(playlist.id)
-                            .first()
-                            .map { it.toSongItem() }
-                    candidateList.addAll(pSongs)
+                val historyStats = database.historySongStatistics(0L, Long.MAX_VALUE)
+                if (historyStats.isNotEmpty()) {
+                    val topSongs = database.statisticsSongs(historyStats.take(count))
+                    candidateList.addAll(topSongs)
                 }
             } catch (_: Exception) {
             }
 
-            // 2. Liked songs
+            // 2. Liked / favorite tracks
             try {
                 val liked =
                     database
@@ -94,36 +147,30 @@ object DesktopSmartDownloadManager {
             } catch (_: Exception) {
             }
 
-            // 3. Library tracks
-            try {
-                val libraryTracks =
-                    database
-                        .dao()
-                        .songsByPlayTimeAsc()
-                        .first()
-                        .reversed()
-                        .map { it.toSongItem() }
-                candidateList.addAll(libraryTracks)
-            } catch (_: Exception) {
-            }
-
-            // 4. Most Played tracks from playback history (exact data from Dashboard stats)
-            try {
-                val historyStats = database.historySongStatistics(0L, Long.MAX_VALUE)
-                if (historyStats.isNotEmpty()) {
-                    val topSongs = database.statisticsSongs(historyStats.take(count))
-                    candidateList.addAll(topSongs)
+            // 3. Optional User Playlists (only when explicitly enabled by user)
+            if (includePlaylists) {
+                try {
+                    val playlists = database.dao().playlists(PlaylistSortType.CREATE_DATE, descending = true).first()
+                    for (playlist in playlists.take(30)) {
+                        val pSongs =
+                            database
+                                .dao()
+                                .playlistSongs(playlist.id)
+                                .first()
+                                .map { it.toSongItem() }
+                        candidateList.addAll(pSongs)
+                    }
+                } catch (_: Exception) {
                 }
-            } catch (_: Exception) {
             }
 
             val distinctCandidates = candidateList.distinctBy { it.id }.toMutableList()
 
-            // 5. Taste Discovery seeded strictly from user's favorites
+            // 4. Taste Discovery seeded from user's top played & liked tracks
             val remainingSlots = count - distinctCandidates.size
             if (remainingSlots > 0 && distinctCandidates.isNotEmpty()) {
                 try {
-                    val seedSong = distinctCandidates.shuffled().firstOrNull()
+                    val seedSong = distinctCandidates.take(15).shuffled().firstOrNull()
                     if (seedSong != null) {
                         val radioRecommendations =
                             GlobalYouTubeRepository.instance
@@ -140,13 +187,15 @@ object DesktopSmartDownloadManager {
         }
 
     suspend fun sync(
-        quota: Int = 100,
-        maxStorageLimitGb: Int = 2,
+        quota: Int = Settings.shared.smartDownloadQuota,
+        maxStorageLimitGb: Int = Settings.shared.smartDownloadStorageLimitGb,
     ): Int =
         withContext(Dispatchers.IO) {
             if (_isSyncing.value) return@withContext 0
             _isSyncing.value = true
             try {
+                pruneToQuota(quota = quota, maxStorageLimitGb = maxStorageLimitGb)
+
                 val downloadDir = DownloadManager.getDownloadDir()
                 val currentDownloadSizeBytes =
                     DownloadManager.downloadedFiles.value.sumOf {
@@ -166,8 +215,42 @@ object DesktopSmartDownloadManager {
                 val candidates = resolveCandidates(quota)
                 if (candidates.isEmpty()) return@withContext 0
 
-                val unDownloaded = candidates.filter { !DownloadManager.isDownloaded(it.id) }
+                val desiredIds = candidates.mapTo(mutableSetOf()) { it.id }
+                val smartIds = readSmartIds().filter { DownloadManager.isDownloaded(it) }.toMutableList()
+                val unDownloadedAll = candidates.filter { !DownloadManager.isDownloaded(it.id) }
+
+                if (unDownloadedAll.isEmpty()) return@withContext 0
+
+                // Rotate stale smart-downloaded songs when quota is reached so new favorites/top tracks replace old ones
+                val slotsNeeded =
+                    if (quota <= 0) {
+                        0
+                    } else {
+                        (smartIds.size + minOf(unDownloadedAll.size, MAX_BATCH_PER_SYNC) - quota).coerceAtLeast(0)
+                    }
+                if (slotsNeeded > 0) {
+                    val staleCandidates =
+                        smartIds.filterNot { it in desiredIds } +
+                            smartIds.filter { it in desiredIds }.reversed()
+                    val toRotate = staleCandidates.distinct().take(minOf(slotsNeeded, MAX_BATCH_PER_SYNC))
+                    if (toRotate.isNotEmpty()) {
+                        DownloadManager.deleteDownloadsAndAwait(toRotate)
+                        smartIds.removeAll(toRotate.toSet())
+                        saveSmartIds(smartIds)
+                    }
+                }
+
+                val remainingQuotaSlots =
+                    if (quota <= 0) {
+                        MAX_BATCH_PER_SYNC
+                    } else {
+                        (quota - smartIds.size).coerceIn(0, MAX_BATCH_PER_SYNC)
+                    }
+                if (remainingQuotaSlots <= 0) return@withContext 0
+
+                val unDownloaded = unDownloadedAll.take(remainingQuotaSlots)
                 if (unDownloaded.isNotEmpty()) {
+                    saveSmartIds(smartIds + unDownloaded.map { it.id })
                     DownloadManager.downloadAll(unDownloaded)
                 }
                 unDownloaded.size

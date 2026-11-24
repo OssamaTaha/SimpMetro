@@ -51,6 +51,8 @@
     <string name="smart_download_quota">Max Songs to Download</string>
     <string name="smart_download_storage_limit">Storage Space Limit</string>
     <string name="smart_download_storage_limit_description">Stops downloading if offline songs reach this storage threshold</string>
+    <string name="smart_download_include_playlists">Include user playlists</string>
+    <string name="smart_download_include_playlists_description">Also auto-download tracks from your playlists in addition to listening history and favorites</string>
     <string name="smart_download_wifi_only">Download only on Wi-Fi</string>
     <string name="smart_download_wifi_only_description">Prevent mobile data consumption for background offline syncing</string>
     <string name="auto_cache_played_songs">Auto-cache played songs</string>

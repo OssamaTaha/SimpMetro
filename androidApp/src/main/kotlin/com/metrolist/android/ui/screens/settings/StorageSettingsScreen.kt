@@ -99,6 +99,8 @@ import com.metrolist.shared.generated.resources.ok
 import com.metrolist.shared.generated.resources.retry
 import com.metrolist.shared.generated.resources.select_download_directory
 import com.metrolist.shared.generated.resources.settings_download_folder_summary
+import com.metrolist.shared.generated.resources.smart_download_include_playlists
+import com.metrolist.shared.generated.resources.smart_download_include_playlists_description
 import com.metrolist.shared.generated.resources.smart_download_quota
 import com.metrolist.shared.generated.resources.smart_download_wifi_only
 import com.metrolist.shared.generated.resources.smart_download_wifi_only_description
@@ -802,6 +804,7 @@ fun StorageSettingsScreen(
                 var smartDownloadEnabled by remember { mutableStateOf(Settings.shared.smartDownloadEnabled) }
                 var smartDownloadQuota by remember { mutableIntStateOf(Settings.shared.smartDownloadQuota) }
                 var smartDownloadStorageLimitGb by remember { mutableIntStateOf(Settings.shared.smartDownloadStorageLimitGb) }
+                var smartDownloadIncludePlaylists by remember { mutableStateOf(Settings.shared.smartDownloadIncludePlaylists) }
                 var smartDownloadWifiOnly by remember { mutableStateOf(Settings.shared.smartDownloadWifiOnly) }
 
                 Column(
@@ -849,6 +852,11 @@ fun StorageSettingsScreen(
                                             storageLimitGb = limitGb,
                                             wifiOnly = smartDownloadWifiOnly,
                                         )
+                                        SmartDownloadWorker.triggerImmediate(
+                                            context,
+                                            quota = smartDownloadQuota,
+                                            storageLimitGb = limitGb,
+                                        )
                                     },
                                 ),
                             isFirst = false,
@@ -859,7 +867,7 @@ fun StorageSettingsScreen(
                                 listChooserSettingsItem(
                                     title = stringResource(Res.string.smart_download_quota),
                                     description = if (smartDownloadQuota <= 0) "Unlimited (by storage cap)" else pluralStringResource(Res.plurals.n_song, smartDownloadQuota, smartDownloadQuota),
-                                    options = listOf(0, 100, 250, 500, 1000),
+                                    options = listOf(0, 50, 100, 250, 500, 1000),
                                     selectedOption = smartDownloadQuota,
                                     optionToString = { count -> if (count <= 0) "Unlimited" else pluralStringResource(Res.plurals.n_song, count, count) },
                                     onOptionSelected = { quota ->
@@ -871,6 +879,25 @@ fun StorageSettingsScreen(
                                             storageLimitGb = smartDownloadStorageLimitGb,
                                             wifiOnly = smartDownloadWifiOnly,
                                         )
+                                        SmartDownloadWorker.triggerImmediate(
+                                            context,
+                                            quota = quota,
+                                            storageLimitGb = smartDownloadStorageLimitGb,
+                                        )
+                                    },
+                                ),
+                            isFirst = false,
+                            isLast = false,
+                        )
+                        SettingsSubScreenItemRow(
+                            item =
+                                switchSettingsItem(
+                                    title = stringResource(Res.string.smart_download_include_playlists),
+                                    description = stringResource(Res.string.smart_download_include_playlists_description),
+                                    checked = smartDownloadIncludePlaylists,
+                                    onCheckedChange = { include ->
+                                        Settings.shared.smartDownloadIncludePlaylists = include
+                                        smartDownloadIncludePlaylists = include
                                     },
                                 ),
                             isFirst = false,

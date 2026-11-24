@@ -74,6 +74,8 @@ import com.metrolist.shared.generated.resources.reset
 import com.metrolist.shared.generated.resources.select_download_directory
 import com.metrolist.shared.generated.resources.settings_download_folder_summary
 import com.metrolist.shared.generated.resources.settings_reset_download_folder_summary
+import com.metrolist.shared.generated.resources.smart_download_include_playlists
+import com.metrolist.shared.generated.resources.smart_download_include_playlists_description
 import com.metrolist.shared.generated.resources.smart_download_quota
 import com.metrolist.shared.generated.resources.smart_download_storage_limit
 import com.metrolist.shared.generated.resources.smart_download_storage_limit_description
@@ -482,6 +484,7 @@ fun StorageSettingsScreen(
                 var smartDownloadEnabled by remember { mutableStateOf(Settings.shared.smartDownloadEnabled) }
                 var smartDownloadQuota by remember { mutableIntStateOf(Settings.shared.smartDownloadQuota) }
                 var smartDownloadStorageLimitGb by remember { mutableIntStateOf(Settings.shared.smartDownloadStorageLimitGb) }
+                var smartDownloadIncludePlaylists by remember { mutableStateOf(Settings.shared.smartDownloadIncludePlaylists) }
                 val isSmartSyncing by DesktopSmartDownloadManager.isSyncing.collectAsState()
 
                 StorageSettingRow(
@@ -518,6 +521,12 @@ fun StorageSettingsScreen(
                             val newQuota = quotaOptions[nextIndex]
                             Settings.shared.smartDownloadQuota = newQuota
                             smartDownloadQuota = newQuota
+                            scope.launch {
+                                DesktopSmartDownloadManager.pruneToQuota(
+                                    quota = newQuota,
+                                    maxStorageLimitGb = smartDownloadStorageLimitGb,
+                                )
+                            }
                         },
                     )
                     val limitOptions = listOf(1, 2, 3, 5, 10)
@@ -531,7 +540,26 @@ fun StorageSettingsScreen(
                             val newLimit = limitOptions[nextIndex]
                             Settings.shared.smartDownloadStorageLimitGb = newLimit
                             smartDownloadStorageLimitGb = newLimit
+                            scope.launch {
+                                DesktopSmartDownloadManager.pruneToQuota(
+                                    quota = smartDownloadQuota,
+                                    maxStorageLimitGb = newLimit,
+                                )
+                            }
                         },
+                    )
+                    StorageSettingRow(
+                        stringResource(Res.string.smart_download_include_playlists),
+                        stringResource(Res.string.smart_download_include_playlists_description),
+                        isFirst = false,
+                        isLast = false,
+                        checked = smartDownloadIncludePlaylists,
+                        onClick = {
+                            val updated = !smartDownloadIncludePlaylists
+                            Settings.shared.smartDownloadIncludePlaylists = updated
+                            smartDownloadIncludePlaylists = updated
+                        },
+                        trailingContent = { Switch(smartDownloadIncludePlaylists, onCheckedChange = null) },
                     )
                     StorageSettingRow(
                         if (isSmartSyncing) {

@@ -275,6 +275,20 @@ android {
         buildConfigField("String", "BUNDLED_LANGUAGE_TAGS", "\"${bundledLanguageTags.joinToString(",")}\"")
     }
 
+    signingConfigs {
+        getByName("debug") {
+            val projectKeystore = rootProject.file("debug.keystore")
+            if (projectKeystore.exists()) {
+                storeFile = projectKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     val keystorePath = System.getenv("KEYSTORE_PATH") ?: ""
     val storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
     val keyAliasName = System.getenv("KEY_ALIAS") ?: ""

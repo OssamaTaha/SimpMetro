@@ -133,10 +133,33 @@ class SmartDownloadEngine(
 
     /**
      * Executes the smart download synchronization:
-     * Enqueues missing tracks to [SongDownloadManager] while respecting quota.
+     * Enqueues missing tracks to [SongDownloadManager] while respecting quota and storage limits.
+     * Prevents accidental disk saturation by checking device free space and max allowed GB.
      */
-    suspend fun sync(quota: Int = 100): Int =
+    suspend fun sync(
+        quota: Int = 100,
+        maxStorageLimitGb: Int = 2,
+    ): Int =
         withContext(Dispatchers.IO) {
+            val audioCacheManager = GlobalContext.get().getOrNull<com.metrolist.android.playback.AudioCacheManager>()
+            if (audioCacheManager != null) {
+                val currentDownloadSizeBytes = audioCacheManager.getDownloadSizeBytes()
+                val maxAllowedBytes = maxStorageLimitGb.toLong() * 1024L * 1024L * 1024L
+                if (currentDownloadSizeBytes >= maxAllowedBytes) {
+                    Timber.w("SmartDownload: Aborting sync - current offline downloads (${currentDownloadSizeBytes / (1024 * 1024)} MB) reached configured storage cap ($maxStorageLimitGb GB)")
+                    return@withContext 0
+                }
+
+                // Check free space on download directory - always keep at least 1 GB free on the device
+                val downloadDir = audioCacheManager.downloadDirectory()
+                val freeSpaceBytes = downloadDir.freeSpace
+                val minSafeFreeSpaceBytes = 1024L * 1024L * 1024L // 1 GB safety buffer
+                if (freeSpaceBytes < minSafeFreeSpaceBytes) {
+                    Timber.w("SmartDownload: Aborting sync - low device storage (${freeSpaceBytes / (1024 * 1024)} MB free). Protecting device from accidental storage exhaustion.")
+                    return@withContext 0
+                }
+            }
+
             val candidates = resolveCandidates(quota)
             if (candidates.isEmpty()) {
                 Timber.d("SmartDownload: No candidate tracks resolved (waiting for user listening data)")
@@ -165,7 +188,8 @@ class SmartDownloadWorker(
                 val engine = SmartDownloadEngine(database, songDownloadManager)
 
                 val quota = inputData.getInt(KEY_QUOTA, 100)
-                engine.sync(quota)
+                val storageLimitGb = inputData.getInt(KEY_STORAGE_LIMIT_GB, 2)
+                engine.sync(quota = quota, maxStorageLimitGb = storageLimitGb)
                 Result.success()
             } catch (e: Exception) {
                 Timber.e(e, "SmartDownloadWorker encountered error during sync")
@@ -176,6 +200,7 @@ class SmartDownloadWorker(
     companion object {
         const val WORK_NAME_PERIODIC = "metrolist_smart_download_periodic"
         const val KEY_QUOTA = "quota"
+        const val KEY_STORAGE_LIMIT_GB = "storage_limit_gb"
 
         /**
          * Schedules the 24-hour background smart download job.
@@ -184,6 +209,7 @@ class SmartDownloadWorker(
         fun schedule(
             context: Context,
             quota: Int = 100,
+            storageLimitGb: Int = 2,
             wifiOnly: Boolean = true,
             chargingOnly: Boolean = false,
         ) {
@@ -199,6 +225,12 @@ class SmartDownloadWorker(
             val request =
                 PeriodicWorkRequestBuilder<SmartDownloadWorker>(24, TimeUnit.HOURS)
                     .setConstraints(constraints)
+                    .setInputData(
+                        androidx.work.workDataOf(
+                            KEY_QUOTA to quota,
+                            KEY_STORAGE_LIMIT_GB to storageLimitGb,
+                        )
+                    )
                     .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -214,11 +246,17 @@ class SmartDownloadWorker(
         fun triggerImmediate(
             context: Context,
             quota: Int = 100,
+            storageLimitGb: Int = 2,
         ) {
             val request =
                 androidx.work
                     .OneTimeWorkRequestBuilder<SmartDownloadWorker>()
-                    .setInputData(androidx.work.workDataOf(KEY_QUOTA to quota))
+                    .setInputData(
+                        androidx.work.workDataOf(
+                            KEY_QUOTA to quota,
+                            KEY_STORAGE_LIMIT_GB to storageLimitGb,
+                        )
+                    )
                     .build()
             WorkManager.getInstance(context).enqueue(request)
         }

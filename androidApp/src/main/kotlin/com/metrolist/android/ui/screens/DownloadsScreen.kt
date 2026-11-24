@@ -142,7 +142,8 @@ fun DownloadsScreen(onNavigateBack: () -> Unit) {
                             syncTriggered = true
                             com.metrolist.android.playback.smartdownload.SmartDownloadWorker.triggerImmediate(
                                 context,
-                                Settings.shared.smartDownloadQuota,
+                                quota = Settings.shared.smartDownloadQuota,
+                                storageLimitGb = Settings.shared.smartDownloadStorageLimitGb,
                             )
                         },
                         modifier = Modifier.padding(start = 8.dp),

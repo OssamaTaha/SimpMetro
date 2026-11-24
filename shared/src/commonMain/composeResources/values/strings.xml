@@ -27,7 +27,9 @@
     <string name="smart_downloads_description">Auto-downloads songs tailored to your taste and playlists</string>
     <string name="smart_downloads_sync_now">Sync Now</string>
     <string name="smart_downloads_syncing">Syncing…</string>
-    <string name="smart_download_quota">Smart Download Quota</string>
+    <string name="smart_download_quota">Max Songs to Download</string>
+    <string name="smart_download_storage_limit">Storage Space Limit</string>
+    <string name="smart_download_storage_limit_description">Stops downloading if offline songs reach this storage threshold</string>
     <string name="smart_download_wifi_only">Download only on Wi-Fi</string>
     <string name="smart_download_wifi_only_description">Prevent mobile data consumption for background offline syncing</string>
     <string name="listening_clock">Listening Clock</string>

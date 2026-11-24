@@ -801,6 +801,7 @@ fun StorageSettingsScreen(
             ) {
                 var smartDownloadEnabled by remember { mutableStateOf(Settings.shared.smartDownloadEnabled) }
                 var smartDownloadQuota by remember { mutableIntStateOf(Settings.shared.smartDownloadQuota) }
+                var smartDownloadStorageLimitGb by remember { mutableIntStateOf(Settings.shared.smartDownloadStorageLimitGb) }
                 var smartDownloadWifiOnly by remember { mutableStateOf(Settings.shared.smartDownloadWifiOnly) }
 
                 Column(
@@ -819,6 +820,7 @@ fun StorageSettingsScreen(
                                         SmartDownloadWorker.schedule(
                                             context,
                                             quota = smartDownloadQuota,
+                                            storageLimitGb = smartDownloadStorageLimitGb,
                                             wifiOnly = smartDownloadWifiOnly,
                                         )
                                     } else {
@@ -833,6 +835,28 @@ fun StorageSettingsScreen(
                         SettingsSubScreenItemRow(
                             item =
                                 listChooserSettingsItem(
+                                    title = "Storage Space Limit",
+                                    description = "Stops downloading if offline songs reach this storage threshold ($smartDownloadStorageLimitGb GB)",
+                                    options = listOf(1, 2, 3, 5, 10),
+                                    selectedOption = smartDownloadStorageLimitGb,
+                                    optionToString = { gb -> "$gb GB" },
+                                    onOptionSelected = { limitGb ->
+                                        Settings.shared.smartDownloadStorageLimitGb = limitGb
+                                        smartDownloadStorageLimitGb = limitGb
+                                        SmartDownloadWorker.schedule(
+                                            context,
+                                            quota = smartDownloadQuota,
+                                            storageLimitGb = limitGb,
+                                            wifiOnly = smartDownloadWifiOnly,
+                                        )
+                                    },
+                                ),
+                            isFirst = false,
+                            isLast = false,
+                        )
+                        SettingsSubScreenItemRow(
+                            item =
+                                listChooserSettingsItem(
                                     title = stringResource(Res.string.smart_download_quota),
                                     description = pluralStringResource(Res.plurals.n_song, smartDownloadQuota, smartDownloadQuota),
                                     options = listOf(50, 100, 200, 500),
@@ -844,6 +868,7 @@ fun StorageSettingsScreen(
                                         SmartDownloadWorker.schedule(
                                             context,
                                             quota = quota,
+                                            storageLimitGb = smartDownloadStorageLimitGb,
                                             wifiOnly = smartDownloadWifiOnly,
                                         )
                                     },
@@ -863,6 +888,7 @@ fun StorageSettingsScreen(
                                         SmartDownloadWorker.schedule(
                                             context,
                                             quota = smartDownloadQuota,
+                                            storageLimitGb = smartDownloadStorageLimitGb,
                                             wifiOnly = wifiOnly,
                                         )
                                     },

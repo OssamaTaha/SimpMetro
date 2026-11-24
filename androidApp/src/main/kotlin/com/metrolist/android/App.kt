@@ -381,6 +381,7 @@ class App :
             com.metrolist.android.playback.smartdownload.SmartDownloadWorker.schedule(
                 this,
                 quota = Settings.shared.smartDownloadQuota,
+                storageLimitGb = Settings.shared.smartDownloadStorageLimitGb,
                 wifiOnly = Settings.shared.smartDownloadWifiOnly,
                 chargingOnly = Settings.shared.smartDownloadChargingOnly,
             )

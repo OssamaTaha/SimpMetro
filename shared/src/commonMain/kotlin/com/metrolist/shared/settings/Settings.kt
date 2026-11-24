@@ -350,6 +350,7 @@ class Settings(
     // Smart Downloads (Automated taste-based offline cache)
     var smartDownloadEnabled by preference("smart_download_enabled", true)
     var smartDownloadQuota by preference("smart_download_quota", 100)
+    var smartDownloadStorageLimitGb by preference("smart_download_storage_limit_gb", 2)
     var smartDownloadWifiOnly by preference("smart_download_wifi_only", true)
     var smartDownloadChargingOnly by preference("smart_download_charging_only", false)
 

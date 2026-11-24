@@ -1002,6 +1002,9 @@ private fun runDesktopApp(args: Array<String>) {
             DesktopAutomaticBackupScheduler.start(applicationScope)
             SongMetadataState.bind(database, applicationScope)
             CrossDeviceSyncEngine.localDatabaseProvider = { database }
+            CrossDeviceSyncEngine.localEndpointsProvider = {
+                com.metrolist.shared.deviceconnect.getAvailableSyncEndpoints()
+            }
             CrossDeviceSyncEngine.localDownloadsProvider = {
                 DownloadManager.downloadStates.value
                     .filterValues { it == DownloadState.DOWNLOADED }

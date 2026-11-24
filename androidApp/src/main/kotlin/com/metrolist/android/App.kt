@@ -320,6 +320,9 @@ class App :
         Timber.tag(TAG).d("Koin init complete elapsed=%dms", SystemClock.elapsedRealtime() - koinStart)
 
         CrossDeviceSyncEngine.localDatabaseProvider = { get<MusicDatabase>() }
+        CrossDeviceSyncEngine.localEndpointsProvider = {
+            com.metrolist.shared.deviceconnect.getAvailableSyncEndpoints()
+        }
         CrossDeviceSyncEngine.localDownloadsProvider = {
             get<MusicDatabase>().dao().cachedAudioIdsByKind(KIND_DOWNLOAD).first()
         }

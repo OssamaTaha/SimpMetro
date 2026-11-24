@@ -39,6 +39,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -751,6 +753,19 @@ fun AutoPlaylistScreen(
                         }
                     },
                     actions = {
+                        if (currentType == "downloaded") {
+                            IconButton(
+                                onClick = onOpenDownloadQueue,
+                                modifier = Modifier.tvFocusHighlight(CircleShape),
+                                shapes = IconButtonDefaults.shapes(),
+                            ) {
+                                Icon(
+                                    imageVector = MetrolistIcons.Outlined.Sync,
+                                    contentDescription = "Smart Downloads & Sync",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = { editingCover = currentType },
                             modifier = Modifier.tvFocusHighlight(CircleShape),
@@ -991,10 +1006,58 @@ fun AutoPlaylistScreen(
                     aboveOrderControls =
                         if (currentType == "downloaded") {
                             {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp, vertical = 6.dp)
+                                        .clickable { onOpenDownloadQueue() },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    ),
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = MetrolistIcons.Outlined.Sync,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(26.dp),
+                                            )
+                                            Column {
+                                                Text(
+                                                    "Smart Downloads & Queue",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                                Text(
+                                                    "Auto-syncs library, lists & taste discovery",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                        Button(
+                                            onClick = onOpenDownloadQueue,
+                                            shapes = ButtonDefaults.shapes(),
+                                        ) {
+                                            Text("Manage")
+                                        }
+                                    }
+                                }
                                 DownloadQueuePanel(
                                     manager = songDownloadManager,
                                     onSeeAll = onOpenDownloadQueue,
-                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    modifier = Modifier.padding(vertical = 4.dp),
                                 )
                             }
                         } else {

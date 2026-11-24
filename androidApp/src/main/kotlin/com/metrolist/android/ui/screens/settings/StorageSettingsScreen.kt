@@ -917,11 +917,75 @@ fun StorageSettingsScreen(
             SettingsSubScreenGroup(
                 title = stringResource(Res.string.song_cache),
             ) {
+                var songCacheEnabled by remember { mutableStateOf(Settings.shared.songCacheEnabled) }
+                var preCacheNextSong by remember { mutableStateOf(Settings.shared.preCacheNextSong) }
+                var autoDownloadOnLike by remember { mutableStateOf(Settings.shared.autoDownloadOnLike) }
+                var cacheWifiOnly by remember { mutableStateOf(Settings.shared.cacheWifiOnly) }
                 val songCacheValues = SongCacheLimitsMb
 
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    SettingsSubScreenItemRow(
+                        item =
+                            switchSettingsItem(
+                                title = "Auto-cache played songs",
+                                description = "Cache tracks while streaming for instant offline replay",
+                                checked = songCacheEnabled,
+                                onCheckedChange = { checked ->
+                                    Settings.shared.songCacheEnabled = checked
+                                    songCacheEnabled = checked
+                                },
+                            ),
+                        isFirst = true,
+                        isLast = false,
+                    )
+
+                    SettingsSubScreenItemRow(
+                        item =
+                            switchSettingsItem(
+                                title = "Pre-cache next song",
+                                description = "Pre-buffer upcoming track in background for gapless playback",
+                                checked = preCacheNextSong,
+                                onCheckedChange = { checked ->
+                                    Settings.shared.preCacheNextSong = checked
+                                    preCacheNextSong = checked
+                                },
+                            ),
+                        isFirst = false,
+                        isLast = false,
+                    )
+
+                    SettingsSubScreenItemRow(
+                        item =
+                            switchSettingsItem(
+                                title = "Auto-cache liked songs",
+                                description = "Automatically cache tracks when you add them to favorites",
+                                checked = autoDownloadOnLike,
+                                onCheckedChange = { checked ->
+                                    Settings.shared.autoDownloadOnLike = checked
+                                    autoDownloadOnLike = checked
+                                },
+                            ),
+                        isFirst = false,
+                        isLast = false,
+                    )
+
+                    SettingsSubScreenItemRow(
+                        item =
+                            switchSettingsItem(
+                                title = "Cache on Wi-Fi only",
+                                description = "Prevent caching audio streams over cellular mobile data",
+                                checked = cacheWifiOnly,
+                                onCheckedChange = { checked ->
+                                    Settings.shared.cacheWifiOnly = checked
+                                    cacheWifiOnly = checked
+                                },
+                            ),
+                        isFirst = false,
+                        isLast = false,
+                    )
+
                     CacheSliderCard(
                         revision = cacheSliderRevision,
                         title = stringResource(Res.string.max_song_cache_size),
@@ -949,7 +1013,7 @@ fun StorageSettingsScreen(
                         },
                         steps = songCacheValues.size - 1,
                         enabled = !isCalculatingSizes,
-                        isFirst = true,
+                        isFirst = false,
                         isLast = false,
                     )
 
@@ -997,6 +1061,17 @@ fun StorageSettingsScreen(
                                 title = stringResource(Res.string.song_cache_directory),
                                 description = audioCacheManager.cacheDirectoryLabel(),
                                 onClick = { showCacheDirectory = true },
+                            ),
+                        isFirst = false,
+                        isLast = false,
+                    )
+
+                    SettingsSubScreenItemRow(
+                        item =
+                            SettingsSubScreenItem(
+                                title = stringResource(Res.string.clear_song_cache),
+                                description = stringResource(Res.string.clear_song_cache_dialog),
+                                onClick = { clearSongCacheDialog = true },
                             ),
                         isFirst = false,
                         isLast = true,

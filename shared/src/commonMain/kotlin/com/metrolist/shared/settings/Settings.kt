@@ -596,7 +596,9 @@ class Settings(
     var showUploadedPlaylist by preference(true)
     var showCachedPlaylist by preference(true)
 
-    var songCacheEnabled by preference(false)
+    var songCacheEnabled by preference(true)
+    var preCacheNextSong by preference("pre_cache_next_song", true)
+    var cacheWifiOnly by preference("cache_wifi_only", false)
     var maxSongCacheSize by preference(1024)
     var maxImageCacheSize by preference(512)
     var audioCacheLocation by preference("INTERNAL")

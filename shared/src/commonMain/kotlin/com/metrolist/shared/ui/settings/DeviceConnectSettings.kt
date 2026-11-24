@@ -203,7 +203,17 @@ internal fun SettingsUiRegistryBuilder.deviceConnectPage(host: DeviceConnectSett
             val syncScope = rememberCoroutineScope()
 
             custom("librarySyncCustomDirect", stringResource(Res.string.library_sync)) {
+                val localEndpoints = remember {
+                    CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
+                }
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (localEndpoints.isNotEmpty()) {
+                        Text(
+                            "This Device Address: ${localEndpoints.first()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     Text(
                         stringResource(Res.string.library_sync_peer_address),
                         style = MaterialTheme.typography.titleMedium,

@@ -6,6 +6,12 @@ import java.net.NetworkInterface
 
 internal actual fun getLocalIpV4Addresses(): List<String> = deviceConnectLanIpv4Addresses().mapNotNull { it.hostAddress }
 
+fun getAvailableSyncEndpoints(port: Int = 8765): List<String> =
+    deviceConnectLanIpv4Addresses()
+        .mapNotNull { it.hostAddress }
+        .sortedByDescending { it.startsWith("100.") }
+        .map { "http://$it:$port" }
+
 internal fun isDeviceConnectLanIpv4(address: Inet4Address): Boolean =
     !address.isLoopbackAddress && !address.isLinkLocalAddress &&
         (address.isSiteLocalAddress || isDeviceConnectLanHost(address.hostAddress.orEmpty()))

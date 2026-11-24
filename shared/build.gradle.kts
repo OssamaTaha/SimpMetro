@@ -404,6 +404,7 @@ kotlin {
                     implementation(libs.ktor.client.logging)
                     implementation(libs.ktor.client.cio)
                     implementation(libs.okhttp)
+                    api("com.google.zxing:core:3.5.3")
                 }
             }
         getByName("androidMain") {

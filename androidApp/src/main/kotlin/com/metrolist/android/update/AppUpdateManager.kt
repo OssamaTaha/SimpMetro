@@ -58,7 +58,8 @@ data class GitHubRelease(
     /** Nightlies share one tag, so their package digest tells them apart. */
     val updateKey: String get() = if (isNightly) "$NIGHTLY_TAG:${apk?.digest}" else version
     val isPublishedStable: Boolean
-        get() = !draft && !prerelease && ReleaseVersion.parse(tagName)?.prerelease?.isEmpty() == true
+        get() = !draft && (!prerelease || BuildConfig.DEBUG) &&
+            (ReleaseVersion.parse(tagName)?.prerelease?.isEmpty() == true || BuildConfig.DEBUG)
     val apk: GitHubReleaseAsset?
         get() {
             val candidates =
@@ -68,10 +69,17 @@ data class GitHubRelease(
                         BLOCKED_APK_MARKERS.none { marker -> asset.name.contains(marker, ignoreCase = true) }
                 }
             val preferredNames =
-                PREFERRED_APK_NAMES + listOf("metrolist-android-$version.apk", "metrolist-android-$version-universal.apk")
+                PREFERRED_APK_NAMES + listOf(
+                    "simpmetro-android-$version.apk",
+                    "SimpMetro-Android-release.apk",
+                    "SimpMetro.apk",
+                    "SimpMetro-debug.apk",
+                    "metrolist-android-$version.apk",
+                    "metrolist-android-$version-universal.apk",
+                )
             return preferredNames.firstNotNullOfOrNull { preferred ->
                 candidates.singleOrNull { it.name.equals(preferred, ignoreCase = true) }
-            }
+            } ?: candidates.firstOrNull()
         }
 }
 
@@ -599,10 +607,14 @@ private val PREFERRED_APK_NAMES =
     listOf(
         "SimpMetro.apk",
         "SimpMetro-Android-release.apk",
+        "SimpMetro-debug.apk",
+        "androidApp-debug.apk",
         "Metrolist.apk",
         "Metrolist-Android-release.apk",
         "androidApp-release.apk",
         "nightly-SimpMetro-Android-release.apk",
         "nightly-Metrolist-Android-release.apk",
     )
-private val BLOCKED_APK_MARKERS = listOf("debug", "unsigned", "unaligned", "test", "benchmark")
+private val BLOCKED_APK_MARKERS =
+    if (BuildConfig.DEBUG) listOf("unsigned", "unaligned")
+    else listOf("debug", "unsigned", "unaligned", "test", "benchmark")

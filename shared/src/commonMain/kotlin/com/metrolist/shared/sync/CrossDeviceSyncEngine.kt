@@ -48,6 +48,7 @@ object CrossDeviceSyncEngine {
     var onNewDownloadsRequested: ((List<String>) -> Unit)? = null
     var localDatabaseProvider: (() -> MusicDatabase)? = null
     var localDownloadsProvider: (suspend () -> List<String>)? = null
+    var localEndpointsProvider: (() -> List<String>)? = null
 
     suspend fun exportPayload(
         database: MusicDatabase,

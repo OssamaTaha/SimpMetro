@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -85,6 +86,8 @@ import com.metrolist.shared.backup.importForeignBackup
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.entities.PlaylistEntity
 import com.metrolist.shared.sync.CrossDeviceSyncEngine
+import com.metrolist.android.ui.components.QrDecoder
+import com.metrolist.shared.ui.components.QrCodeView
 import com.metrolist.shared.generated.resources.library_sync
 import com.metrolist.shared.generated.resources.library_sync_summary
 import com.metrolist.shared.generated.resources.library_sync_peer_address
@@ -2007,11 +2010,110 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
                 ),
         )
 
+        val localEndpoints = remember {
+            CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
+        }
+        val primaryEndpoint = localEndpoints.firstOrNull() ?: "http://127.0.0.1:8765"
+        var showMyQrCode by remember { mutableStateOf(false) }
+
+        val qrImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                val decoded = QrDecoder.decodeUri(context, uri)
+                if (decoded != null) {
+                    syncAddressInput = decoded
+                    val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke()
+                    if (db != null) {
+                        scope.launch {
+                            val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                            CrossDeviceSyncEngine.syncWithPeer(
+                                peerEndpoint = decoded,
+                                database = db,
+                                deviceId = Settings.shared.deviceConnectDeviceId,
+                                deviceName = Settings.shared.deviceConnectDeviceName,
+                                downloadedIds = downloaded,
+                            )
+                        }
+                    }
+                } else {
+                    Toast.makeText(context, "No QR code found in selected image", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Connect & Sync between Devices",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Scan a QR code on your PC or enter its Tailscale/LAN address to sync libraries.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = { qrImagePicker.launch("image/*") },
+                        modifier = Modifier.weight(1f),
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text("📷 Scan QR Photo")
+                    }
+
+                    Button(
+                        onClick = {
+                            val clip = QrDecoder.getClipboardEndpoint(context)
+                            if (clip != null) {
+                                syncAddressInput = clip
+                            } else {
+                                Toast.makeText(context, "No valid address found in clipboard", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text("📋 Paste")
+                    }
+
+                    if (localEndpoints.isNotEmpty()) {
+                        Button(
+                            onClick = { showMyQrCode = !showMyQrCode },
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Text(if (showMyQrCode) "Hide QR" else "My QR")
+                        }
+                    }
+                }
+
+                if (showMyQrCode && localEndpoints.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            "This Phone Address: $primaryEndpoint",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            QrCodeView(content = primaryEndpoint, sizeDp = 180.dp)
+                        }
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+
                 OutlinedTextField(
                     value = syncAddressInput,
                     onValueChange = { syncAddressInput = it },

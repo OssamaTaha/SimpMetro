@@ -47,22 +47,10 @@ class SmartDownloadEngine(
             val count = targetCount.coerceIn(20, 500)
             val candidateList = mutableListOf<SongItem>()
 
-            // 1. Most Played tracks from playback history (the exact music data shown on the Dashboard)
-            try {
-                val historyStats = database.historySongStatistics(0L, Long.MAX_VALUE)
-                if (historyStats.isNotEmpty()) {
-                    val topSongs = database.statisticsSongs(historyStats.take(count))
-                    candidateList.addAll(topSongs)
-                    Timber.d("SmartDownload: Resolved ${topSongs.size} dashboard top songs")
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "SmartDownload: Failed to fetch dashboard top songs")
-            }
-
-            // 2. User Playlists (local and bookmarked playlists)
+            // 1. User Playlists (local and bookmarked playlists - top priority)
             try {
                 val playlists = database.dao().playlists(PlaylistSortType.CREATE_DATE, descending = true).first()
-                for (playlist in playlists.take(15)) {
+                for (playlist in playlists.take(30)) {
                     val pSongs =
                         database
                             .dao()
@@ -76,7 +64,7 @@ class SmartDownloadEngine(
                 Timber.e(e, "SmartDownload: Failed to fetch playlist tracks")
             }
 
-            // 3. Liked / Favorited tracks
+            // 2. Liked / Favorited tracks
             try {
                 val liked =
                     database
@@ -90,7 +78,7 @@ class SmartDownloadEngine(
                 Timber.e(e, "SmartDownload: Failed to fetch liked songs")
             }
 
-            // 4. Library tracks
+            // 3. Library tracks
             try {
                 val libraryTracks =
                     database
@@ -100,8 +88,21 @@ class SmartDownloadEngine(
                         .reversed()
                         .map { it.toSongItem() }
                 candidateList.addAll(libraryTracks)
+                Timber.d("SmartDownload: Resolved ${libraryTracks.size} library songs")
             } catch (e: Exception) {
                 Timber.e(e, "SmartDownload: Failed to fetch library songs")
+            }
+
+            // 4. Most Played tracks from playback history (the exact music data shown on the Dashboard)
+            try {
+                val historyStats = database.historySongStatistics(0L, Long.MAX_VALUE)
+                if (historyStats.isNotEmpty()) {
+                    val topSongs = database.statisticsSongs(historyStats.take(count))
+                    candidateList.addAll(topSongs)
+                    Timber.d("SmartDownload: Resolved ${topSongs.size} dashboard top songs")
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "SmartDownload: Failed to fetch dashboard top songs")
             }
 
             // Deduplicate user candidates

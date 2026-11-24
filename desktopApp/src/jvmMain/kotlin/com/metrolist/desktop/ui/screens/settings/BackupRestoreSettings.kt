@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -67,6 +68,7 @@ import com.metrolist.shared.db.JdbcSQLiteDriver
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.entities.PlaylistEntity
 import com.metrolist.shared.sync.CrossDeviceSyncEngine
+import com.metrolist.shared.ui.components.QrCodeView
 import com.metrolist.shared.generated.resources.library_sync
 import com.metrolist.shared.generated.resources.library_sync_summary
 import com.metrolist.shared.generated.resources.library_sync_peer_address
@@ -756,11 +758,76 @@ fun BackupRestoreSettingsScreen(colorScheme: ColorScheme) {
                     ),
             )
 
+            val localEndpoints = remember {
+                CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
+            }
+            val primaryEndpoint = localEndpoints.firstOrNull() ?: "http://127.0.0.1:8765"
+            var showQrCode by remember { mutableStateOf(true) }
+
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Connect & Sync between Devices",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "Scan this QR code with your phone (or enter the address below) to sync your library over Tailscale or local network.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    if (localEndpoints.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Host Address: $primaryEndpoint",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                if (localEndpoints.size > 1) {
+                                    Text(
+                                        "Other IPs: ${localEndpoints.drop(1).joinToString(", ")}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = { showQrCode = !showQrCode },
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
+                                Text(if (showQrCode) "Hide QR" else "Show QR")
+                            }
+                        }
+
+                        if (showQrCode) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                QrCodeView(
+                                    content = primaryEndpoint,
+                                    sizeDp = 200.dp,
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    Text(
+                        "Or Connect to Another Device:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     OutlinedTextField(
                         value = syncAddressInput,
                         onValueChange = { syncAddressInput = it },

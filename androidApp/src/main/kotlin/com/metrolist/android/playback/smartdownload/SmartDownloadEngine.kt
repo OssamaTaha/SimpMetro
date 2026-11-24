@@ -42,9 +42,11 @@ class SmartDownloadEngine(
      * - Taste discovery (seeded strictly from the user's top/favorite tracks)
      * Never queries generic trending hits.
      */
-    suspend fun resolveCandidates(targetCount: Int = 100): List<SongItem> =
+    suspend fun resolveCandidates(targetCount: Int = 0): List<SongItem> =
         withContext(Dispatchers.IO) {
-            val count = targetCount.coerceIn(20, 500)
+            // targetCount <= 0 means unlimited songs (governed purely by storage limits)
+            val isUnlimited = targetCount <= 0
+            val count = if (isUnlimited) 5000 else targetCount.coerceIn(20, 5000)
             val candidateList = mutableListOf<SongItem>()
 
             // 1. User Playlists (local and bookmarked playlists - top priority)

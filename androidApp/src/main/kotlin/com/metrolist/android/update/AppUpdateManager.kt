@@ -24,10 +24,13 @@ import com.metrolist.shared.update.NIGHTLY_TAG
 import com.metrolist.shared.update.ReleaseVersion
 import com.metrolist.shared.update.checkNightly
 import com.metrolist.shared.update.followsNightlyUpdates
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -144,10 +147,24 @@ object AppUpdateManager {
     private val mutableReleases = MutableStateFlow<List<GitHubRelease>>(emptyList())
     private val operationMutex = Mutex()
 
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     @Volatile private var activeDownload: Call? = null
 
     val state: StateFlow<AppUpdateState> = mutableState.asStateFlow()
     val releases: StateFlow<List<GitHubRelease>> = mutableReleases.asStateFlow()
+
+    fun startBackgroundDownload(
+        context: Context,
+        release: GitHubRelease,
+        crashRecovery: Boolean = false,
+        skipVerification: Boolean = false,
+    ) {
+        val appContext = context.applicationContext
+        applicationScope.launch {
+            download(appContext, release, crashRecovery, skipVerification)
+        }
+    }
 
     suspend fun checkAtStartup(
         context: Context,

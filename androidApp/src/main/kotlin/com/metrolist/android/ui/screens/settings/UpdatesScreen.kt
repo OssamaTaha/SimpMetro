@@ -546,7 +546,7 @@ fun UpdateDetailsScreen(
 
                 current is AppUpdateState.Available -> {
                     Button(
-                        onClick = { scope.launch { AppUpdateManager.download(context, current.release, crashRecovery) } },
+                        onClick = { AppUpdateManager.startBackgroundDownload(context, current.release, crashRecovery) },
                         modifier = buttonModifier,
                         shapes = ButtonDefaults.shapes(),
                     ) {
@@ -559,14 +559,12 @@ fun UpdateDetailsScreen(
                         if (release != null && current.failure == UpdateFailure.DIGEST) {
                             OutlinedButton(
                                 onClick = {
-                                    scope.launch {
-                                        AppUpdateManager.download(
-                                            context,
-                                            release,
-                                            crashRecovery,
-                                            skipVerification = true,
-                                        )
-                                    }
+                                    AppUpdateManager.startBackgroundDownload(
+                                        context,
+                                        release,
+                                        crashRecovery,
+                                        skipVerification = true,
+                                    )
                                 },
                                 modifier =
                                     Modifier
@@ -584,12 +582,10 @@ fun UpdateDetailsScreen(
                         }
                         Button(
                             onClick = {
-                                scope.launch {
-                                    if (release == null || current.failure != UpdateFailure.DOWNLOAD) {
-                                        AppUpdateManager.check(context, crashRecovery = crashRecovery)
-                                    } else {
-                                        AppUpdateManager.download(context, release, crashRecovery)
-                                    }
+                                if (release == null || current.failure != UpdateFailure.DOWNLOAD) {
+                                    scope.launch { AppUpdateManager.check(context, crashRecovery = crashRecovery) }
+                                } else {
+                                    AppUpdateManager.startBackgroundDownload(context, release, crashRecovery)
                                 }
                             },
                             modifier = buttonModifier,

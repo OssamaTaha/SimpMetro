@@ -664,7 +664,7 @@ fun MetrolistApp(
                         onClick = {
                             updatePrompt = null
                             navigator.navigate(Screen.UpdateDetails)
-                            updateScope.launch { AppUpdateManager.download(context, release) }
+                            AppUpdateManager.startBackgroundDownload(context, release)
                         },
                         shapes = ButtonDefaults.shapes(),
                     ) {

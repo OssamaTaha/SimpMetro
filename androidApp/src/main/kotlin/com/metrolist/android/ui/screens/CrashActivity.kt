@@ -207,7 +207,7 @@ class CrashActivity : ComponentActivity() {
                                 TextButton(onClick = {
                                     updatePrompt = null
                                     showUpdate = true
-                                    scope.launch { AppUpdateManager.download(this@CrashActivity, release, crashRecovery = true) }
+                                    AppUpdateManager.startBackgroundDownload(this@CrashActivity, release, crashRecovery = true)
                                 }) { Text(stringResource(Res.string.crash_updates_install)) }
                             },
                             dismissButton = {

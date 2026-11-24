@@ -858,10 +858,10 @@ fun StorageSettingsScreen(
                             item =
                                 listChooserSettingsItem(
                                     title = stringResource(Res.string.smart_download_quota),
-                                    description = pluralStringResource(Res.plurals.n_song, smartDownloadQuota, smartDownloadQuota),
-                                    options = listOf(50, 100, 200, 500),
+                                    description = if (smartDownloadQuota <= 0) "Unlimited (by storage cap)" else pluralStringResource(Res.plurals.n_song, smartDownloadQuota, smartDownloadQuota),
+                                    options = listOf(0, 100, 250, 500, 1000),
                                     selectedOption = smartDownloadQuota,
-                                    optionToString = { count -> pluralStringResource(Res.plurals.n_song, count, count) },
+                                    optionToString = { count -> if (count <= 0) "Unlimited" else pluralStringResource(Res.plurals.n_song, count, count) },
                                     onOptionSelected = { quota ->
                                         Settings.shared.smartDownloadQuota = quota
                                         smartDownloadQuota = quota

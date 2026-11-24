@@ -143,6 +143,7 @@ fun StoredPlaylistContent(
     loadCompleteSongs: (suspend () -> List<SongItem>?)? = null,
     onDownload: (List<SongItem>) -> Unit,
     onAddToPlaylist: (List<SongItem>) -> Unit,
+    extraAboveOrderControls: (@Composable () -> Unit)? = null,
     trackContainer: @Composable (SongItem, Boolean, @Composable () -> Unit) -> Unit = { _, _, content -> content() },
 ) {
     val isDownloadedCollection = id == "local:downloaded"
@@ -417,8 +418,13 @@ fun StoredPlaylistContent(
                 }
             },
         aboveOrderControls =
-            if (selectionEnabled && downloadFilter != null) {
-                { DownloadPlaylistFilterBar(downloadFilter, downloadFilterDatabase) }
+            if ((selectionEnabled && downloadFilter != null) || extraAboveOrderControls != null) {
+                {
+                    extraAboveOrderControls?.invoke()
+                    if (selectionEnabled && downloadFilter != null) {
+                        DownloadPlaylistFilterBar(downloadFilter, downloadFilterDatabase)
+                    }
+                }
             } else {
                 null
             },

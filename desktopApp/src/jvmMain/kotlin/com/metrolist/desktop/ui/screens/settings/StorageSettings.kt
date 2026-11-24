@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -23,12 +24,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import coil3.compose.LocalPlatformContext
+import com.metrolist.desktop.storage.DesktopSmartDownloadManager
 import com.metrolist.desktop.storage.DownloadManager
 import com.metrolist.desktop.storage.SongCacheManager
 import com.metrolist.desktop.utils.DesktopImageLoader
 import com.metrolist.shared.api.musicvideo.MusicVideoResolver
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.animated_artwork_cache
+import com.metrolist.shared.generated.resources.auto_cache_liked_songs
+import com.metrolist.shared.generated.resources.auto_cache_liked_songs_description
+import com.metrolist.shared.generated.resources.auto_cache_played_songs
+import com.metrolist.shared.generated.resources.auto_cache_played_songs_description
 import com.metrolist.shared.generated.resources.cache_size_warning_message
 import com.metrolist.shared.generated.resources.cache_size_warning_title
 import com.metrolist.shared.generated.resources.cached_resolutions
@@ -62,10 +68,19 @@ import com.metrolist.shared.generated.resources.max_image_cache_size
 import com.metrolist.shared.generated.resources.max_song_cache_size
 import com.metrolist.shared.generated.resources.music_video_cache
 import com.metrolist.shared.generated.resources.ok
+import com.metrolist.shared.generated.resources.pre_cache_next_song
+import com.metrolist.shared.generated.resources.pre_cache_next_song_description
 import com.metrolist.shared.generated.resources.reset
 import com.metrolist.shared.generated.resources.select_download_directory
 import com.metrolist.shared.generated.resources.settings_download_folder_summary
 import com.metrolist.shared.generated.resources.settings_reset_download_folder_summary
+import com.metrolist.shared.generated.resources.smart_download_quota
+import com.metrolist.shared.generated.resources.smart_download_storage_limit
+import com.metrolist.shared.generated.resources.smart_download_storage_limit_description
+import com.metrolist.shared.generated.resources.smart_downloads
+import com.metrolist.shared.generated.resources.smart_downloads_description
+import com.metrolist.shared.generated.resources.smart_downloads_sync_now
+import com.metrolist.shared.generated.resources.smart_downloads_syncing
 import com.metrolist.shared.generated.resources.song_cache
 import com.metrolist.shared.generated.resources.unlimited
 import com.metrolist.shared.settings.Settings
@@ -463,14 +478,125 @@ fun StorageSettingsScreen(
                     }, subtitle = stringResource(Res.string.settings_reset_download_folder_summary))
                 }
             }
-            DesktopStorageSection(songTitle, listOf("song", "cache")) {
+            DesktopStorageSection(stringResource(Res.string.smart_downloads), listOf("smart", "download", "offline", "sync", "auto")) {
+                var smartDownloadEnabled by remember { mutableStateOf(Settings.shared.smartDownloadEnabled) }
+                var smartDownloadQuota by remember { mutableIntStateOf(Settings.shared.smartDownloadQuota) }
+                var smartDownloadStorageLimitGb by remember { mutableIntStateOf(Settings.shared.smartDownloadStorageLimitGb) }
+                val isSmartSyncing by DesktopSmartDownloadManager.isSyncing.collectAsState()
+
                 StorageSettingRow(
-                    stringResource(Res.string.enable_song_cache),
-                    stringResource(Res.string.enable_song_cache_desc),
+                    stringResource(Res.string.smart_downloads),
+                    stringResource(Res.string.smart_downloads_description),
                     isFirst = true,
-                    checked = Settings.shared.songCacheEnabled,
-                    onClick = { Settings.shared.songCacheEnabled = !Settings.shared.songCacheEnabled },
-                    trailingContent = { Switch(Settings.shared.songCacheEnabled, onCheckedChange = null) },
+                    isLast = !smartDownloadEnabled,
+                    checked = smartDownloadEnabled,
+                    onClick = {
+                        val updated = !smartDownloadEnabled
+                        Settings.shared.smartDownloadEnabled = updated
+                        smartDownloadEnabled = updated
+                        if (updated) {
+                            scope.launch {
+                                DesktopSmartDownloadManager.sync(
+                                    quota = smartDownloadQuota,
+                                    maxStorageLimitGb = smartDownloadStorageLimitGb,
+                                )
+                            }
+                        }
+                    },
+                    trailingContent = { Switch(smartDownloadEnabled, onCheckedChange = null) },
+                )
+                if (smartDownloadEnabled) {
+                    val quotaOptions = listOf(0, 50, 100, 200, 500)
+                    val quotaLabel = if (smartDownloadQuota <= 0) unlimited else "$smartDownloadQuota"
+                    StorageSettingRow(
+                        stringResource(Res.string.smart_download_quota),
+                        quotaLabel,
+                        isFirst = false,
+                        isLast = false,
+                        onClick = {
+                            val nextIndex = (quotaOptions.indexOf(smartDownloadQuota) + 1) % quotaOptions.size
+                            val newQuota = quotaOptions[nextIndex]
+                            Settings.shared.smartDownloadQuota = newQuota
+                            smartDownloadQuota = newQuota
+                        },
+                    )
+                    val limitOptions = listOf(1, 2, 3, 5, 10)
+                    StorageSettingRow(
+                        stringResource(Res.string.smart_download_storage_limit),
+                        "$smartDownloadStorageLimitGb GB - " + stringResource(Res.string.smart_download_storage_limit_description),
+                        isFirst = false,
+                        isLast = false,
+                        onClick = {
+                            val nextIndex = (limitOptions.indexOf(smartDownloadStorageLimitGb) + 1) % limitOptions.size
+                            val newLimit = limitOptions[nextIndex]
+                            Settings.shared.smartDownloadStorageLimitGb = newLimit
+                            smartDownloadStorageLimitGb = newLimit
+                        },
+                    )
+                    StorageSettingRow(
+                        if (isSmartSyncing) {
+                            stringResource(
+                                Res.string.smart_downloads_syncing,
+                            )
+                        } else {
+                            stringResource(Res.string.smart_downloads_sync_now)
+                        },
+                        isFirst = false,
+                        isLast = true,
+                        enabled = !isSmartSyncing,
+                        onClick = {
+                            scope.launch {
+                                DesktopSmartDownloadManager.sync(
+                                    quota = smartDownloadQuota,
+                                    maxStorageLimitGb = smartDownloadStorageLimitGb,
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+            DesktopStorageSection(songTitle, listOf("song", "cache")) {
+                var songCacheEnabled by remember { mutableStateOf(Settings.shared.songCacheEnabled) }
+                var preCacheNextSong by remember { mutableStateOf(Settings.shared.preCacheNextSong) }
+                var autoDownloadOnLike by remember { mutableStateOf(Settings.shared.autoDownloadOnLike) }
+                StorageSettingRow(
+                    stringResource(Res.string.auto_cache_played_songs),
+                    stringResource(Res.string.auto_cache_played_songs_description),
+                    isFirst = true,
+                    isLast = false,
+                    checked = songCacheEnabled,
+                    onClick = {
+                        val updated = !songCacheEnabled
+                        Settings.shared.songCacheEnabled = updated
+                        songCacheEnabled = updated
+                    },
+                    trailingContent = { Switch(songCacheEnabled, onCheckedChange = null) },
+                )
+                StorageSettingRow(
+                    stringResource(Res.string.pre_cache_next_song),
+                    stringResource(Res.string.pre_cache_next_song_description),
+                    isFirst = false,
+                    isLast = false,
+                    checked = preCacheNextSong,
+                    onClick = {
+                        val updated = !preCacheNextSong
+                        Settings.shared.preCacheNextSong = updated
+                        preCacheNextSong = updated
+                    },
+                    trailingContent = { Switch(preCacheNextSong, onCheckedChange = null) },
+                )
+                StorageSettingRow(
+                    stringResource(Res.string.auto_cache_liked_songs),
+                    stringResource(Res.string.auto_cache_liked_songs_description),
+                    isFirst = false,
+                    isLast = false,
+                    checked = autoDownloadOnLike,
+                    onClick = {
+                        val updated = !autoDownloadOnLike
+                        Settings.shared.autoDownloadOnLike = updated
+                        autoDownloadOnLike = updated
+                    },
+                    trailingContent = { Switch(autoDownloadOnLike, onCheckedChange = null) },
                 )
                 StorageSliderRow(
                     stringResource(Res.string.max_song_cache_size),

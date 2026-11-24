@@ -76,6 +76,7 @@ import com.metrolist.shared.state.GlobalYouTube
 import com.metrolist.shared.state.SongLikeState
 import com.metrolist.shared.state.SongMetadataState
 import com.metrolist.shared.state.coreModule
+import com.metrolist.shared.deviceconnect.CrossDeviceSyncServer
 import com.metrolist.shared.sync.CrossDeviceSyncEngine
 import com.metrolist.shared.utils.isCrashReportingAvailable
 import com.metrolist.shared.youtube.di.sharedModule
@@ -321,7 +322,10 @@ class App :
 
         CrossDeviceSyncEngine.localDatabaseProvider = { get<MusicDatabase>() }
         CrossDeviceSyncEngine.localEndpointsProvider = {
-            com.metrolist.shared.deviceconnect.getAvailableSyncEndpoints()
+            CrossDeviceSyncServer.availableEndpoints()
+        }
+        get<CoroutineScope>().launch(Dispatchers.IO) {
+            CrossDeviceSyncServer.ensureStarted()
         }
         CrossDeviceSyncEngine.localDownloadsProvider = {
             get<MusicDatabase>().dao().cachedAudioIdsByKind(KIND_DOWNLOAD).first()

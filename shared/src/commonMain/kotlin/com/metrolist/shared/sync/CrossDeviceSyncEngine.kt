@@ -367,7 +367,7 @@ object CrossDeviceSyncEngine {
                     } else {
                         clean.substringBefore(':')
                     }
-                val port = if (clean.contains(":")) clean.substringAfterLast(':').toIntOrNull() ?: 48517 else 48517
+                val port = if (clean.contains(":")) clean.substringAfterLast(':').toIntOrNull() ?: 8765 else 8765
                 val url = "http://$host:$port/sync/v1"
 
                 val localPayload = exportPayload(database, deviceId, deviceName, downloadedIds)

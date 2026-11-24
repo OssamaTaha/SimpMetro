@@ -26,6 +26,7 @@ import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.app_name
 import com.metrolist.shared.generated.resources.browse
 import com.metrolist.shared.generated.resources.cached_playlist
+import com.metrolist.shared.generated.resources.dashboard
 import com.metrolist.shared.generated.resources.downloaded
 import com.metrolist.shared.generated.resources.filter_library
 import com.metrolist.shared.generated.resources.history
@@ -114,7 +115,7 @@ object LayoutUtils {
                 NavigationId.HOME -> stringResource(Res.string.home)
                 NavigationId.LIBRARY -> stringResource(Res.string.filter_library)
                 NavigationId.HISTORY -> stringResource(Res.string.history)
-                NavigationId.STATISTICS -> stringResource(Res.string.statistics)
+                NavigationId.STATISTICS -> stringResource(Res.string.dashboard)
                 NavigationId.LISTEN_TOGETHER -> stringResource(Res.string.listen_together)
                 else -> appName
             }

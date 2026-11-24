@@ -39,6 +39,7 @@ import com.metrolist.desktop.utils.MacMenuBarTemplateHelper
 import com.metrolist.desktop.utils.ThemeUtils
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.close
+import com.metrolist.shared.generated.resources.dashboard
 import com.metrolist.shared.generated.resources.home
 import com.metrolist.shared.generated.resources.menu_about_metrolist
 import com.metrolist.shared.generated.resources.menu_account
@@ -467,7 +468,7 @@ fun FrameWindowScope.DesktopMenuBar(
                 onClick = { navigateToMainTab(NavigationId.HISTORY, navigator) },
             )
             Item(
-                text = stringResource(Res.string.statistics),
+                text = stringResource(Res.string.dashboard),
                 icon = menuIcon(statsPainter),
                 onClick = { navigateToMainTab(NavigationId.STATISTICS, navigator) },
             )

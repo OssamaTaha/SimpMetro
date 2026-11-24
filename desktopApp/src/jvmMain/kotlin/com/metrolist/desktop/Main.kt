@@ -105,6 +105,7 @@ import com.metrolist.desktop.state.playback.DesktopPlaybackController
 import com.metrolist.desktop.state.playback.ListenTogetherState
 import com.metrolist.desktop.state.playback.LyricsState
 import com.metrolist.desktop.state.playback.PlayerState
+import com.metrolist.desktop.storage.DesktopSmartDownloadManager
 import com.metrolist.desktop.storage.DownloadManager
 import com.metrolist.desktop.storage.DownloadState
 import com.metrolist.desktop.storage.SongCacheManager
@@ -168,6 +169,7 @@ import com.metrolist.shared.auth.YouTubeSessionState
 import com.metrolist.shared.db.DatabaseDowngradeException
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.entities.toSongItem
+import com.metrolist.shared.deviceconnect.CrossDeviceSyncServer
 import com.metrolist.shared.discord.DiscordRpcManager
 import com.metrolist.shared.discord.observeDiscordInitialization
 import com.metrolist.shared.generated.resources.Res
@@ -1003,7 +1005,10 @@ private fun runDesktopApp(args: Array<String>) {
             SongMetadataState.bind(database, applicationScope)
             CrossDeviceSyncEngine.localDatabaseProvider = { database }
             CrossDeviceSyncEngine.localEndpointsProvider = {
-                com.metrolist.shared.deviceconnect.getAvailableSyncEndpoints()
+                CrossDeviceSyncServer.availableEndpoints()
+            }
+            applicationScope.launch(Dispatchers.IO) {
+                CrossDeviceSyncServer.ensureStarted()
             }
             CrossDeviceSyncEngine.localDownloadsProvider = {
                 DownloadManager.downloadStates.value
@@ -1022,6 +1027,7 @@ private fun runDesktopApp(args: Array<String>) {
                     }
                 }
             }
+            DesktopSmartDownloadManager.start(applicationScope)
 
             LastFM.initialize(
                 apiKey = BuildConfig.LASTFM_API_KEY,

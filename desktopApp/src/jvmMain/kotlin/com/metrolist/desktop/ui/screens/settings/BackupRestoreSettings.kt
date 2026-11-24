@@ -3,11 +3,11 @@
 package com.metrolist.desktop.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -48,6 +48,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.DecodeHintType
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
 import com.metrolist.desktop.backup.DesktopAutomaticBackupScheduler
 import com.metrolist.desktop.backup.DesktopBackupRestoreManager
 import com.metrolist.desktop.spotifyimport.DesktopAmazonMusicImportFlow
@@ -67,16 +72,6 @@ import com.metrolist.shared.backup.importForeignBackup
 import com.metrolist.shared.db.JdbcSQLiteDriver
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.entities.PlaylistEntity
-import com.metrolist.shared.sync.CrossDeviceSyncEngine
-import com.metrolist.shared.ui.components.QrCodeView
-import com.metrolist.shared.generated.resources.library_sync
-import com.metrolist.shared.generated.resources.library_sync_summary
-import com.metrolist.shared.generated.resources.library_sync_peer_address
-import com.metrolist.shared.generated.resources.library_sync_peer_hint
-import com.metrolist.shared.generated.resources.library_sync_connect_and_sync
-import com.metrolist.shared.generated.resources.library_sync_syncing
-import com.metrolist.shared.generated.resources.library_sync_success
-import com.metrolist.shared.generated.resources.library_sync_failed
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.action_backup
 import com.metrolist.shared.generated.resources.action_restore
@@ -173,6 +168,25 @@ import com.metrolist.shared.generated.resources.import_status_fetching_metadata
 import com.metrolist.shared.generated.resources.import_status_fetching_tracks
 import com.metrolist.shared.generated.resources.import_status_saving_tracks
 import com.metrolist.shared.generated.resources.import_tracks_found
+import com.metrolist.shared.generated.resources.library_sync
+import com.metrolist.shared.generated.resources.library_sync_card_desc_desktop
+import com.metrolist.shared.generated.resources.library_sync_card_title
+import com.metrolist.shared.generated.resources.library_sync_clipboard_empty
+import com.metrolist.shared.generated.resources.library_sync_connect_and_sync
+import com.metrolist.shared.generated.resources.library_sync_failed
+import com.metrolist.shared.generated.resources.library_sync_hide_qr
+import com.metrolist.shared.generated.resources.library_sync_host_address
+import com.metrolist.shared.generated.resources.library_sync_or_connect_other
+import com.metrolist.shared.generated.resources.library_sync_other_ips
+import com.metrolist.shared.generated.resources.library_sync_paste
+import com.metrolist.shared.generated.resources.library_sync_peer_address
+import com.metrolist.shared.generated.resources.library_sync_peer_hint
+import com.metrolist.shared.generated.resources.library_sync_qr_not_found
+import com.metrolist.shared.generated.resources.library_sync_scan_qr_image
+import com.metrolist.shared.generated.resources.library_sync_show_qr
+import com.metrolist.shared.generated.resources.library_sync_success
+import com.metrolist.shared.generated.resources.library_sync_summary
+import com.metrolist.shared.generated.resources.library_sync_syncing
 import com.metrolist.shared.generated.resources.local_playlist
 import com.metrolist.shared.generated.resources.menu_paste
 import com.metrolist.shared.generated.resources.n_song
@@ -202,11 +216,13 @@ import com.metrolist.shared.playlistimport.UniversalPlaylistParser
 import com.metrolist.shared.playlistimport.readPlaylistText
 import com.metrolist.shared.settings.Settings
 import com.metrolist.shared.state.GlobalYouTubeRepository
+import com.metrolist.shared.sync.CrossDeviceSyncEngine
 import com.metrolist.shared.ui.components.AlertDialog
 import com.metrolist.shared.ui.components.Dialog
 import com.metrolist.shared.ui.components.ExpressiveFilterChip
 import com.metrolist.shared.ui.components.PopupContent
 import com.metrolist.shared.ui.components.PopupVisibility
+import com.metrolist.shared.ui.components.QrCodeView
 import com.metrolist.shared.ui.menu.CsvColumnMappingDialog
 import com.metrolist.shared.ui.utils.DragScrollableColumn
 import com.metrolist.shared.ui.utils.verticalScrollWithDrag
@@ -225,6 +241,7 @@ import org.koin.compose.koinInject
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
 import java.io.File
+import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.milliseconds
 
 private enum class DesktopDestinationType {
@@ -758,9 +775,10 @@ fun BackupRestoreSettingsScreen(colorScheme: ColorScheme) {
                     ),
             )
 
-            val localEndpoints = remember {
-                CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
-            }
+            val localEndpoints =
+                remember {
+                    CrossDeviceSyncEngine.localEndpointsProvider?.invoke().orEmpty()
+                }
             val primaryEndpoint = localEndpoints.firstOrNull() ?: "http://127.0.0.1:8765"
             var showQrCode by remember { mutableStateOf(true) }
 
@@ -768,43 +786,38 @@ fun BackupRestoreSettingsScreen(colorScheme: ColorScheme) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             ) {
+                val qrNotFoundMessage = stringResource(Res.string.library_sync_qr_not_found)
+                val clipboardEmptyMessage = stringResource(Res.string.library_sync_clipboard_empty)
+                val scanQrTitle = stringResource(Res.string.library_sync_scan_qr_image)
+
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Connect & Sync between Devices",
+                        stringResource(Res.string.library_sync_card_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        "Scan this QR code with your phone (or enter the address below) to sync your library over Tailscale or local network.",
+                        stringResource(Res.string.library_sync_card_desc_desktop),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
 
                     if (localEndpoints.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                stringResource(Res.string.library_sync_host_address, primaryEndpoint),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            if (localEndpoints.size > 1) {
                                 Text(
-                                    "Host Address: $primaryEndpoint",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                                    stringResource(
+                                        Res.string.library_sync_other_ips,
+                                        localEndpoints.drop(1).joinToString(", "),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                if (localEndpoints.size > 1) {
-                                    Text(
-                                        "Other IPs: ${localEndpoints.drop(1).joinToString(", ")}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                            Button(
-                                onClick = { showQrCode = !showQrCode },
-                                shapes = ButtonDefaults.shapes(),
-                            ) {
-                                Text(if (showQrCode) "Hide QR" else "Show QR")
                             }
                         }
 
@@ -821,10 +834,99 @@ fun BackupRestoreSettingsScreen(colorScheme: ColorScheme) {
                         }
                     }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    val picked = pickDesktopFile(scanQrTitle, listOf("png", "jpg", "jpeg", "webp"))
+                                    if (picked != null) {
+                                        val decoded =
+                                            withContext(Dispatchers.IO) {
+                                                runCatching {
+                                                    val image = ImageIO.read(picked) ?: return@runCatching null
+                                                    val w = image.width
+                                                    val h = image.height
+                                                    val pixels = image.getRGB(0, 0, w, h, null, 0, w)
+                                                    val source = RGBLuminanceSource(w, h, pixels)
+                                                    val bitmap = BinaryBitmap(HybridBinarizer(source))
+                                                    MultiFormatReader()
+                                                        .decode(
+                                                            bitmap,
+                                                            mapOf(DecodeHintType.TRY_HARDER to true),
+                                                        ).text
+                                                }.getOrNull()
+                                            }
+                                        if (decoded != null) {
+                                            syncAddressInput = decoded
+                                            val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke()
+                                            if (db != null) {
+                                                val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                                                CrossDeviceSyncEngine.syncWithPeer(
+                                                    peerEndpoint = decoded,
+                                                    database = db,
+                                                    deviceId = Settings.shared.deviceConnectDeviceId,
+                                                    deviceName = Settings.shared.deviceConnectDeviceName,
+                                                    downloadedIds = downloaded,
+                                                )
+                                            }
+                                        } else {
+                                            status = qrNotFoundMessage
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Text(stringResource(Res.string.library_sync_scan_qr_image), maxLines = 1)
+                        }
+
+                        Button(
+                            onClick = {
+                                val clipText =
+                                    runCatching {
+                                        Toolkit
+                                            .getDefaultToolkit()
+                                            .systemClipboard
+                                            .getData(DataFlavor.stringFlavor) as? String
+                                    }.getOrNull()?.trim().orEmpty()
+                                if (clipText.startsWith("http://") || clipText.startsWith("https://") ||
+                                    (':' in clipText && '.' in clipText)
+                                ) {
+                                    syncAddressInput = clipText
+                                } else {
+                                    status = clipboardEmptyMessage
+                                }
+                            },
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Text(stringResource(Res.string.library_sync_paste), maxLines = 1)
+                        }
+
+                        if (localEndpoints.isNotEmpty()) {
+                            Button(
+                                onClick = { showQrCode = !showQrCode },
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
+                                Text(
+                                    if (showQrCode) {
+                                        stringResource(Res.string.library_sync_hide_qr)
+                                    } else {
+                                        stringResource(Res.string.library_sync_show_qr)
+                                    },
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     Text(
-                        "Or Connect to Another Device:",
+                        stringResource(Res.string.library_sync_or_connect_other),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )

@@ -92,6 +92,7 @@ import com.metrolist.desktop.ui.components.VideoMiniViewer
 import com.metrolist.desktop.ui.components.deviceConnectSideSheetWidth
 import com.metrolist.shared.generated.resources.Res
 import com.metrolist.shared.generated.resources.close
+import com.metrolist.shared.generated.resources.dashboard
 import com.metrolist.shared.generated.resources.desktop_navigation_together
 import com.metrolist.shared.generated.resources.done
 import com.metrolist.shared.generated.resources.edit_sidebar
@@ -201,7 +202,7 @@ private fun DesktopNavigationScaffold(
                     NavigationId.HOME -> Res.string.home
                     NavigationId.LIBRARY -> Res.string.filter_library
                     NavigationId.HISTORY -> Res.string.menu_history
-                    NavigationId.STATISTICS -> Res.string.statistics
+                    NavigationId.STATISTICS -> Res.string.dashboard
                     NavigationId.LISTEN_TOGETHER -> Res.string.desktop_navigation_together
                     else -> return@mapNotNull null
                 }

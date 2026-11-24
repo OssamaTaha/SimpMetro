@@ -2,14 +2,17 @@
 
 package com.metrolist.android.ui.screens.settings
 
+import android.Manifest
 import android.content.ClipboardManager
 import android.content.ContentResolver
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,9 +89,20 @@ import com.metrolist.shared.backup.importForeignBackup
 import com.metrolist.shared.db.MusicDatabase
 import com.metrolist.shared.db.entities.PlaylistEntity
 import com.metrolist.shared.sync.CrossDeviceSyncEngine
+import com.metrolist.android.ui.components.QrCameraScannerDialog
 import com.metrolist.android.ui.components.QrDecoder
 import com.metrolist.shared.ui.components.QrCodeView
 import com.metrolist.shared.generated.resources.library_sync
+import com.metrolist.shared.generated.resources.library_sync_camera_denied
+import com.metrolist.shared.generated.resources.library_sync_card_desc_android
+import com.metrolist.shared.generated.resources.library_sync_card_title
+import com.metrolist.shared.generated.resources.library_sync_clipboard_empty
+import com.metrolist.shared.generated.resources.library_sync_hide_qr
+import com.metrolist.shared.generated.resources.library_sync_my_qr
+import com.metrolist.shared.generated.resources.library_sync_paste
+import com.metrolist.shared.generated.resources.library_sync_phone_address
+import com.metrolist.shared.generated.resources.library_sync_qr_not_found
+import com.metrolist.shared.generated.resources.library_sync_scan_qr
 import com.metrolist.shared.generated.resources.library_sync_summary
 import com.metrolist.shared.generated.resources.library_sync_peer_address
 import com.metrolist.shared.generated.resources.library_sync_peer_hint
@@ -2015,29 +2029,57 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
         }
         val primaryEndpoint = localEndpoints.firstOrNull() ?: "http://127.0.0.1:8765"
         var showMyQrCode by remember { mutableStateOf(false) }
+        var showQrCameraScanner by remember { mutableStateOf(false) }
+
+        val qrNotFoundMessage = stringResource(Res.string.library_sync_qr_not_found)
+        val cameraDeniedMessage = stringResource(Res.string.library_sync_camera_denied)
+        val clipboardEmptyMessage = stringResource(Res.string.library_sync_clipboard_empty)
+
+        fun handleDecodedEndpoint(decoded: String) {
+            syncAddressInput = decoded
+            val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke()
+            if (db != null) {
+                scope.launch {
+                    val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
+                    CrossDeviceSyncEngine.syncWithPeer(
+                        peerEndpoint = decoded,
+                        database = db,
+                        deviceId = Settings.shared.deviceConnectDeviceId,
+                        deviceName = Settings.shared.deviceConnectDeviceName,
+                        downloadedIds = downloaded,
+                    )
+                }
+            }
+        }
 
         val qrImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) {
                 val decoded = QrDecoder.decodeUri(context, uri)
                 if (decoded != null) {
-                    syncAddressInput = decoded
-                    val db = CrossDeviceSyncEngine.localDatabaseProvider?.invoke()
-                    if (db != null) {
-                        scope.launch {
-                            val downloaded = CrossDeviceSyncEngine.localDownloadsProvider?.invoke().orEmpty()
-                            CrossDeviceSyncEngine.syncWithPeer(
-                                peerEndpoint = decoded,
-                                database = db,
-                                deviceId = Settings.shared.deviceConnectDeviceId,
-                                deviceName = Settings.shared.deviceConnectDeviceName,
-                                downloadedIds = downloaded,
-                            )
-                        }
-                    }
+                    handleDecodedEndpoint(decoded)
                 } else {
-                    Toast.makeText(context, "No QR code found in selected image", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, qrNotFoundMessage, Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+
+        val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                showQrCameraScanner = true
+            } else {
+                Toast.makeText(context, cameraDeniedMessage, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        if (showQrCameraScanner) {
+            QrCameraScannerDialog(
+                onQrDecoded = { decoded ->
+                    showQrCameraScanner = false
+                    handleDecodedEndpoint(decoded)
+                },
+                onPickFromGallery = { qrImagePicker.launch("image/*") },
+                onDismiss = { showQrCameraScanner = false },
+            )
         }
 
         Card(
@@ -2046,12 +2088,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    "Connect & Sync between Devices",
+                    stringResource(Res.string.library_sync_card_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "Scan a QR code on your PC or enter its Tailscale/LAN address to sync libraries.",
+                    stringResource(Res.string.library_sync_card_desc_android),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2061,11 +2103,19 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Button(
-                        onClick = { qrImagePicker.launch("image/*") },
+                        onClick = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                showQrCameraScanner = true
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                         shapes = ButtonDefaults.shapes(),
                     ) {
-                        Text("📷 Scan QR Photo")
+                        Text(stringResource(Res.string.library_sync_scan_qr), maxLines = 1)
                     }
 
                     Button(
@@ -2074,12 +2124,12 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
                             if (clip != null) {
                                 syncAddressInput = clip
                             } else {
-                                Toast.makeText(context, "No valid address found in clipboard", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, clipboardEmptyMessage, Toast.LENGTH_SHORT).show()
                             }
                         },
                         shapes = ButtonDefaults.shapes(),
                     ) {
-                        Text("📋 Paste")
+                        Text(stringResource(Res.string.library_sync_paste), maxLines = 1)
                     }
 
                     if (localEndpoints.isNotEmpty()) {
@@ -2087,7 +2137,14 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
                             onClick = { showMyQrCode = !showMyQrCode },
                             shapes = ButtonDefaults.shapes(),
                         ) {
-                            Text(if (showMyQrCode) "Hide QR" else "My QR")
+                            Text(
+                                if (showMyQrCode) {
+                                    stringResource(Res.string.library_sync_hide_qr)
+                                } else {
+                                    stringResource(Res.string.library_sync_my_qr)
+                                },
+                                maxLines = 1,
+                            )
                         }
                     }
                 }
@@ -2099,7 +2156,7 @@ fun BackupRestoreScreen(onNavigateBack: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Text(
-                            "This Phone Address: $primaryEndpoint",
+                            stringResource(Res.string.library_sync_phone_address, primaryEndpoint),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                         )

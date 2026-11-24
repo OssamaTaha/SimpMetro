@@ -7,8 +7,10 @@
 
 package com.metrolist.desktop.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,10 +18,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,14 +41,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.metrolist.desktop.state.app.AppState
+import com.metrolist.desktop.state.app.UiState
 import com.metrolist.desktop.state.content.ArtistState
 import com.metrolist.desktop.state.content.HomeState
 import com.metrolist.desktop.state.content.LibraryState
 import com.metrolist.desktop.state.playback.PlayerState
 import com.metrolist.desktop.storage.CachedSongEntry
+import com.metrolist.desktop.storage.DesktopSmartDownloadManager
 import com.metrolist.desktop.storage.DownloadManager
 import com.metrolist.desktop.storage.DownloadedFile
 import com.metrolist.desktop.storage.SongCacheManager
@@ -77,6 +86,11 @@ import com.metrolist.shared.generated.resources.liked_songs_subtitle
 import com.metrolist.shared.generated.resources.liked_songs_title
 import com.metrolist.shared.generated.resources.local_file
 import com.metrolist.shared.generated.resources.remove
+import com.metrolist.shared.generated.resources.smart_downloads_manage
+import com.metrolist.shared.generated.resources.smart_downloads_queue_desc
+import com.metrolist.shared.generated.resources.smart_downloads_queue_title
+import com.metrolist.shared.generated.resources.smart_downloads_sync_now
+import com.metrolist.shared.generated.resources.smart_downloads_syncing
 import com.metrolist.shared.generated.resources.top_playlist_empty
 import com.metrolist.shared.generated.resources.top_playlist_empty_hint
 import com.metrolist.shared.generated.resources.top_playlist_subtitle
@@ -111,6 +125,7 @@ import com.metrolist.shared.ui.menu.rememberCursorContextMenuState
 import com.metrolist.shared.ui.navigation.LocalNavigator
 import com.metrolist.shared.ui.screens.StoredPlaylistContent
 import com.metrolist.shared.ui.screens.rememberPendingCollectionPlayState
+import com.metrolist.shared.ui.settings.SettingsPageId
 import com.metrolist.shared.ui.utils.rememberFileSizeFormatter
 import io.ktor.utils.io.jvm.javaio.toByteReadChannel
 import kotlinx.coroutines.CancellationException
@@ -211,6 +226,8 @@ private fun TopPlaylistScreen() {
 private fun DownloadedPlaylistScreen() {
     val database = remember { GlobalContext.get().get<MusicDatabase>() }
     val files = LibraryState.downloadedFiles
+    val scope = rememberCoroutineScope()
+    val isSmartSyncing by DesktopSmartDownloadManager.isSyncing.collectAsState()
     val snapshot by produceState(emptyList<SongItem>() to emptyMap<String, CollectionMeta>(), files) {
         value =
             withContext(Dispatchers.IO) {
@@ -227,6 +244,95 @@ private fun DownloadedPlaylistScreen() {
         songs = snapshot.first,
         emptyMessage = stringResource(Res.string.downloaded_songs_empty),
         emptyHint = stringResource(Res.string.downloaded_songs_empty_hint),
+        headerActionLabel =
+            if (isSmartSyncing) {
+                stringResource(Res.string.smart_downloads_syncing)
+            } else {
+                stringResource(Res.string.smart_downloads_sync_now)
+            },
+        headerActionIcon = MetrolistIcons.Outlined.Sync,
+        isHeaderActionLoading = isSmartSyncing,
+        onHeaderAction = {
+            if (!isSmartSyncing) {
+                scope.launch {
+                    DesktopSmartDownloadManager.sync(
+                        quota = Settings.shared.smartDownloadQuota,
+                        maxStorageLimitGb = Settings.shared.smartDownloadStorageLimitGb,
+                    )
+                }
+            }
+        },
+        extraAboveOrderControls = {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = MetrolistIcons.Outlined.Sync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(26.dp),
+                        )
+                        Column {
+                            Text(
+                                stringResource(Res.string.smart_downloads_queue_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                stringResource(Res.string.smart_downloads_queue_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                UiState.selectedSettingsPage = SettingsPageId.STORAGE
+                                UiState.showSettings = true
+                            },
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Text(stringResource(Res.string.smart_downloads_manage))
+                        }
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    DesktopSmartDownloadManager.sync(
+                                        quota = Settings.shared.smartDownloadQuota,
+                                        maxStorageLimitGb = Settings.shared.smartDownloadStorageLimitGb,
+                                    )
+                                }
+                            },
+                            enabled = !isSmartSyncing,
+                            shapes = ButtonDefaults.shapes(),
+                        ) {
+                            Text(
+                                if (isSmartSyncing) {
+                                    stringResource(Res.string.smart_downloads_syncing)
+                                } else {
+                                    stringResource(Res.string.smart_downloads_sync_now)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
         collectionMetadata = snapshot.second,
         onRemoveSongs = { ids -> DownloadManager.deleteDownloadsAndAwait(ids) },
         onClearCollection = DownloadManager::clearAllDownloads,
@@ -405,6 +511,7 @@ private fun LocalPlaylistLayout(
     onReorderSongs: ((List<SongItem>) -> Unit)? = null,
     hasMoreSongs: Boolean = false,
     loadCompleteSongs: (suspend () -> List<SongItem>?)? = null,
+    extraAboveOrderControls: (@Composable () -> Unit)? = null,
 ) {
     val database = remember { GlobalContext.get().get<MusicDatabase>() }
     val isCachedCollection = type == "cached"
@@ -556,6 +663,7 @@ private fun LocalPlaylistLayout(
             loadCompleteSongs = loadCompleteSongs,
             onDownload = { DownloadManager.downloadAll(it) },
             onAddToPlaylist = { PlayerState.showAddToPlaylistSongs = it },
+            extraAboveOrderControls = extraAboveOrderControls,
         )
 
         PlaylistContextMenu(

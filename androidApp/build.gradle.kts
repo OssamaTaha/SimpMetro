@@ -263,8 +263,8 @@ android {
     defaultConfig {
         applicationId = "com.simpmetro.music"
         minSdk = 24
-        targetSdk = 37
-        versionCode = 155
+        targetSdk = 35
+        versionCode = 156
         versionName = appVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
